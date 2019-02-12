@@ -18735,7 +18735,7 @@ static int init_0_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; dou
 
 
 
-  fprintf(qstderr(), "break3!");
+
   }
  end_trace("init_0", "wavewind.c", 276); } return 0; } 
 #line 289 "wavewind.c"
@@ -19183,15 +19183,19 @@ static int end_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; double
   dump ((struct Dump){"end"});
  end_trace("end", "wavewind.c", 487); } return 0; } 
 
-static int dumpstep_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; double t = *tp;  int ret = (t += k_/sqrt(g_*k_)/32);   *ip = i; *tp = t;   return ret; } static int dumpstep (const int i, const double t, Event * _ev) { trace ("dumpstep", "wavewind.c", 489);  {
+
+
+
+
+static int dumpstep_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; double t = *tp;  int ret = (t += k_/sqrt(g_*k_)/32);   *ip = i; *tp = t;   return ret; } static int dumpstep (const int i, const double t, Event * _ev) { trace ("dumpstep", "wavewind.c", 493);  {
   char dname[100];
   sprintf (dname, "dump%g", t/(k_/sqrt(g_*k_)));
   dump ((struct Dump){dname});
- end_trace("dumpstep", "wavewind.c", 493); } return 0; } 
-#line 502 "wavewind.c"
-static int adapt_0_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; double t = *tp;  int ret = (i++);   *ip = i; *tp = t;   return ret; } static int adapt_0 (const int i, const double t, Event * _ev) { trace ("adapt_0", "wavewind.c", 502);  {
+ end_trace("dumpstep", "wavewind.c", 497); } return 0; } 
+#line 506 "wavewind.c"
+static int adapt_0_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; double t = *tp;  int ret = (i++);   *ip = i; *tp = t;   return ret; } static int adapt_0 (const int i, const double t, Event * _ev) { trace ("adapt_0", "wavewind.c", 506);  {
   adapt_wavelet ((struct Adapt){((scalar []){f,u.x,u.y,{-1}}), (double[]){femax,uemax,uemax,uemax}, LEVEL, 5});
- end_trace("adapt_0", "wavewind.c", 504); } return 0; } 
+ end_trace("adapt_0", "wavewind.c", 508); } return 0; } 
 #line 79 "/home/jiarongw/basilisk/src/navier-stokes/centered.h"
 static double _boundary0 (Point point, Point neighbor, scalar _s) { int ig = neighbor.i - point.i;  if (ig == 0) ig = _attribute[_s.i].d.x;  NOT_UNUSED(ig); int jg = neighbor.j - point.j;  if (jg == 0) jg = _attribute[_s.i].d.y;  NOT_UNUSED(jg); POINT_VARIABLES; 
 #line 78 "/home/jiarongw/basilisk/src/navier-stokes/centered.h"
@@ -22027,7 +22031,7 @@ void _init_solver (void) {
   event_register ((Event){ 0, 1, end, {end_expr0}, ((int *)0), ((double *)0),
     "wavewind.c", 484, "end"});
   event_register ((Event){ 0, 1, dumpstep, {dumpstep_expr0}, ((int *)0), ((double *)0),
-    "wavewind.c", 489, "dumpstep"});
+    "wavewind.c", 493, "dumpstep"});
   event_register ((Event){ 0, 1, set_dtmax, {set_dtmax_expr0}, ((int *)0), ((double *)0),
     "/home/jiarongw/basilisk/src/navier-stokes/centered.h", 167, "set_dtmax"});
   event_register ((Event){ 0, 1, stability, {stability_expr0}, ((int *)0), ((double *)0),
@@ -22069,7 +22073,7 @@ void _init_solver (void) {
   event_register ((Event){ 0, 1, adapt, {adapt_expr0}, ((int *)0), ((double *)0),
     "/home/jiarongw/basilisk/src/navier-stokes/centered.h", 364, "adapt"});
   event_register ((Event){ 0, 1, adapt_0, {adapt_0_expr0}, ((int *)0), ((double *)0),
-    "wavewind.c", 502, "adapt"});
+    "wavewind.c", 506, "adapt"});
   _attribute = (_Attributes *) pcalloc (datasize/sizeof(double), sizeof (_Attributes), __func__, __FILE__, __LINE__);
   all = (scalar *) pmalloc (sizeof (scalar)*13,__func__, __FILE__, __LINE__);
   for (int i = 0; i < 12; i++)

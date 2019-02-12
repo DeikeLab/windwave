@@ -14,8 +14,8 @@ BAS=qcc
 MPICC = mpicc
 OPENGLIBS = -L${BASILISK}/gl -lglutils -lfb_osmesa -lGLU -lOSMesa
 OPENGLINC = ${BASILISK}
-LDFLAGS = -lm
-CC99='mpicc -std=c99'
+LDFLAGS = -lm -ldl
+#CC99='mpicc -std=c99'
 
 #MAKE COMMAND: TAKES ARGUMENT AND MAKES EXECUTABLE IN DESIRED FOLDER
 $(OUTPUT): 

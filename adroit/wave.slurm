@@ -6,6 +6,20 @@
 #SBATCH --mail-type=end
 #SBATCH --mail-user=jiarongw@princeton.edu
 
+LEVEL=11
+ak=0.05
+BO=200
+RE=40000.
+m=8
+B=0
+UstarRATIO=1
 
-./set_dir_run.sh
+export ScratchDir="/scratch/network/jiarongw/parameter/m${m}B${B}Ustar${UstarRATIO}ak${ak}"
+echo $ScratchDir
+rm -rf $ScratchDir
+mkdir -p $ScratchDir
+cp ./wavewind_parallel $ScratchDir
+
+cd $ScratchDir
+srun ./wavewind_parallel $LEVEL $ak $BO $RE $m $B $UstarRATIO
 

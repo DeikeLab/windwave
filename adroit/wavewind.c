@@ -271,7 +271,7 @@ event init (i = 0)
 #else
     while (0);
 #endif
-  fprintf(stderr, "break3!");
+    //fprintf(stderr, "break3!");
   }
 }
 
