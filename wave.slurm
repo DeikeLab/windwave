@@ -12,7 +12,7 @@ BO=200
 RE=40000.
 m=8
 B=0
-UstarRATIO=1
+UstarRATIO=2.5
 
 export ScratchDir="/scratch/jiarongw/parameter/m$m\_B$B\_Ustar$UstarRATIO\_ak$ak"
 echo $ScratchDir

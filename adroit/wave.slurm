@@ -2,14 +2,12 @@
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=8
 #SBATCH --time=2:00:00
-#SBATCH --mail-type=begin
-#SBATCH --mail-type=end
 #SBATCH --mail-user=jiarongw@princeton.edu
 
 LEVEL=11
-ak=0.05
+ak=0.15
 BO=200
-RE=40000.
+RE=40000. #40000 default
 m=8
 B=0
 UstarRATIO=1
@@ -20,6 +18,8 @@ rm -rf $ScratchDir
 mkdir -p $ScratchDir
 cp ./wavewind_parallel $ScratchDir
 
+#SBATCH --output=${ScratchDir}/slurm.out
 cd $ScratchDir
+#mv ./dump ./restart
 srun ./wavewind_parallel $LEVEL $ak $BO $RE $m $B $UstarRATIO
 

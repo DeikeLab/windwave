@@ -326,8 +326,8 @@ int dissipation_rate (double* rates)
    dissipation rate as functions of the non-dimensional time. */
 
 event graphs (i++) {
-  static FILE * fpwater = fopen("budgetWaterwind.dat", "w");
-  static FILE * fpair = fopen("budgetAirwind.dat", "w");
+  static FILE * fpwater = fopen("budgetWaterwind.dat", "a");
+  static FILE * fpair = fopen("budgetAirwind.dat", "a");
   double ke = 0., gpe = 0.;
   double keAir = 0., gpeAir = 0.;
   foreach(reduction(+:ke) reduction(+:gpe) 
@@ -376,7 +376,7 @@ event movies (t += 0.1) {
      refinement fields. In 3D, these are in a $z=0$ cross-section. */
 
   {
-    static FILE * fp = POPEN ("f", "w");
+    static FILE * fp = POPEN ("f", "a");
     output_ppm (f, fp, min = 0, max = 1, n = 512);
   }
 
@@ -385,7 +385,7 @@ event movies (t += 0.1) {
     scalar l[];
     foreach()
       l[] = level;
-    static FILE * fp = POPEN ("level", "w");
+    static FILE * fp = POPEN ("level", "a");
     output_ppm (l, fp, min = 5, max = LEVEL, n = 512);
   }
 #endif
@@ -403,6 +403,7 @@ event movies (t += 0.1) {
   
   scalar omega[];
   vorticity (u, omega);
+
 #if dimension == 2
   view (width = 800, height = 600, fov = 18.8);
   clear();
@@ -438,7 +439,7 @@ event movies (t += 0.1) {
 	  draw_vof ("f");
     }
   {
-    static FILE * fp = POPEN ("below", "w");
+    static FILE * fp = POPEN ("below", "a");
     save (fp = fp);
   }
 
@@ -458,9 +459,9 @@ event movies (t += 0.1) {
 	translate (z = z)
 	  draw_vof ("f");
     }
-#endif // dimension == 3
+#endif 
   {
-    static FILE * fp = POPEN ("movie", "w");
+    static FILE * fp = POPEN ("movie", "a");
     save (fp = fp);
   }
 }
@@ -481,7 +482,7 @@ event snapshot (i += 200) {
    The wave period is `k_/sqrt(g_*k_)`. We want to run up to 2
    (alternatively 4) periods. */
 
-event end (t = 2.*k_/sqrt(g_*k_)) {
+event end (t = 4.*k_/sqrt(g_*k_)) {
   fprintf (fout, "i = %d t = %g\n", i, t);
   dump ("end");
 }

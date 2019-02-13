@@ -18946,8 +18946,8 @@ mpi_all_reduce_double (rateAir, MPI_SUM);
 
 
 static int graphs_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; double t = *tp;  int ret = (i++);   *ip = i; *tp = t;   return ret; } static int graphs (const int i, const double t, Event * _ev) { trace ("graphs", "wavewind.c", 328);  {
-  static FILE * fpwater =NULL; if (!fpwater || i == 0) fpwater = pid() > 0 ? fopen("/dev/null", "w") :  fopen("budgetWaterwind.dat", "w");
-  static FILE * fpair =NULL; if (!fpair || i == 0) fpair = pid() > 0 ? fopen("/dev/null", "w") :  fopen("budgetAirwind.dat", "w");
+  static FILE * fpwater =NULL; if (!fpwater || i == 0) fpwater = pid() > 0 ? fopen("/dev/null", "w") :  fopen("budgetWaterwind.dat", "a");
+  static FILE * fpair =NULL; if (!fpair || i == 0) fpair = pid() > 0 ? fopen("/dev/null", "w") :  fopen("budgetAirwind.dat", "a");
   double ke = 0., gpe = 0.;
   double keAir = 0., gpeAir = 0.;
    { 
@@ -19125,7 +19125,7 @@ static int movies_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; dou
 
 
   {
-    static FILE * fp =NULL; if (!fp || i == 0) fp = pid() > 0 ? fopen("/dev/null", "w") :  fopen ("f" ".ppm", "w");
+    static FILE * fp =NULL; if (!fp || i == 0) fp = pid() > 0 ? fopen("/dev/null", "w") :  fopen ("f" ".ppm", "a");
     output_ppm ((struct OutputPPM){f, fp, .min = 0, .max = 1, .n = 512});
   }
 
@@ -19137,12 +19137,13 @@ static int movies_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; dou
 #line 386 "wavewind.c"
 
       val(l,0,0,0) = level; } end_foreach(); }
-    static FILE * fp =NULL; if (!fp || i == 0) fp = pid() > 0 ? fopen("/dev/null", "w") :  fopen ("level" ".ppm", "w");
+    static FILE * fp =NULL; if (!fp || i == 0) fp = pid() > 0 ? fopen("/dev/null", "w") :  fopen ("level" ".ppm", "a");
     output_ppm ((struct OutputPPM){l, fp, .min = 5, .max = LEVEL, .n = 512});
    delete (((scalar []){l,{-1}})); }
 #line 404 "wavewind.c"
   scalar omega= new_scalar("omega");
   vorticity (u, omega);
+
 
   view ((struct _view_set){.width = 800, .height = 600, .fov = 18.8});
   clear();
@@ -19155,12 +19156,12 @@ static int movies_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; dou
       draw_vof ((struct _draw_vof){"f"});
       squares ((struct _squares){"omega", .linear = true});
     } end_translate(); }
-#line 462 "wavewind.c"
+#line 463 "wavewind.c"
   {
-    static FILE * fp =NULL; if (!fp || i == 0) fp = pid() > 0 ? fopen("/dev/null", "w") :  fopen ("movie" ".ppm", "w");
+    static FILE * fp =NULL; if (!fp || i == 0) fp = pid() > 0 ? fopen("/dev/null", "w") :  fopen ("movie" ".ppm", "a");
     save ((struct _save){.fp = fp});
   }
- delete (((scalar []){omega,{-1}}));  end_trace("movies", "wavewind.c", 466); } return 0; } 
+ delete (((scalar []){omega,{-1}}));  end_trace("movies", "wavewind.c", 467); } return 0; } 
 
 
 
@@ -19168,9 +19169,9 @@ static int movies_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; dou
 
 
 
-static int snapshot_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; double t = *tp;  int ret = (i += 200);   *ip = i; *tp = t;   return ret; } static int snapshot (const int i, const double t, Event * _ev) { trace ("snapshot", "wavewind.c", 474);  {
+static int snapshot_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; double t = *tp;  int ret = (i += 200);   *ip = i; *tp = t;   return ret; } static int snapshot (const int i, const double t, Event * _ev) { trace ("snapshot", "wavewind.c", 475);  {
   dump ((struct Dump){"dump"});
- end_trace("snapshot", "wavewind.c", 476); } return 0; } 
+ end_trace("snapshot", "wavewind.c", 477); } return 0; } 
 
 
 
@@ -19178,24 +19179,24 @@ static int snapshot_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; d
 
 
 
-static int end_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; double t = *tp;  int ret = (t = 2.*k_/sqrt(g_*k_));   *ip = i; *tp = t;   return ret; } static int end (const int i, const double t, Event * _ev) { trace ("end", "wavewind.c", 484);  {
+static int end_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; double t = *tp;  int ret = (t = 4.*k_/sqrt(g_*k_));   *ip = i; *tp = t;   return ret; } static int end (const int i, const double t, Event * _ev) { trace ("end", "wavewind.c", 485);  {
   fprintf (fout, "i = %d t = %g\n", i, t);
   dump ((struct Dump){"end"});
- end_trace("end", "wavewind.c", 487); } return 0; } 
+ end_trace("end", "wavewind.c", 488); } return 0; } 
 
 
 
 
 
-static int dumpstep_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; double t = *tp;  int ret = (t += k_/sqrt(g_*k_)/32);   *ip = i; *tp = t;   return ret; } static int dumpstep (const int i, const double t, Event * _ev) { trace ("dumpstep", "wavewind.c", 493);  {
+static int dumpstep_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; double t = *tp;  int ret = (t += k_/sqrt(g_*k_)/32);   *ip = i; *tp = t;   return ret; } static int dumpstep (const int i, const double t, Event * _ev) { trace ("dumpstep", "wavewind.c", 494);  {
   char dname[100];
   sprintf (dname, "dump%g", t/(k_/sqrt(g_*k_)));
   dump ((struct Dump){dname});
- end_trace("dumpstep", "wavewind.c", 497); } return 0; } 
-#line 506 "wavewind.c"
-static int adapt_0_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; double t = *tp;  int ret = (i++);   *ip = i; *tp = t;   return ret; } static int adapt_0 (const int i, const double t, Event * _ev) { trace ("adapt_0", "wavewind.c", 506);  {
+ end_trace("dumpstep", "wavewind.c", 498); } return 0; } 
+#line 507 "wavewind.c"
+static int adapt_0_expr0 (int * ip, double * tp, Event * _ev) {  int i = *ip; double t = *tp;  int ret = (i++);   *ip = i; *tp = t;   return ret; } static int adapt_0 (const int i, const double t, Event * _ev) { trace ("adapt_0", "wavewind.c", 507);  {
   adapt_wavelet ((struct Adapt){((scalar []){f,u.x,u.y,{-1}}), (double[]){femax,uemax,uemax,uemax}, LEVEL, 5});
- end_trace("adapt_0", "wavewind.c", 508); } return 0; } 
+ end_trace("adapt_0", "wavewind.c", 509); } return 0; } 
 #line 79 "/home/jiarongw/basilisk/src/navier-stokes/centered.h"
 static double _boundary0 (Point point, Point neighbor, scalar _s) { int ig = neighbor.i - point.i;  if (ig == 0) ig = _attribute[_s.i].d.x;  NOT_UNUSED(ig); int jg = neighbor.j - point.j;  if (jg == 0) jg = _attribute[_s.i].d.y;  NOT_UNUSED(jg); POINT_VARIABLES; 
 #line 78 "/home/jiarongw/basilisk/src/navier-stokes/centered.h"
@@ -22027,11 +22028,11 @@ void _init_solver (void) {
   event_register ((Event){ 0, 1, movies, {movies_expr0}, ((int *)0), ((double *)0),
     "wavewind.c", 372, "movies"});
   event_register ((Event){ 0, 1, snapshot, {snapshot_expr0}, ((int *)0), ((double *)0),
-    "wavewind.c", 474, "snapshot"});
+    "wavewind.c", 475, "snapshot"});
   event_register ((Event){ 0, 1, end, {end_expr0}, ((int *)0), ((double *)0),
-    "wavewind.c", 484, "end"});
+    "wavewind.c", 485, "end"});
   event_register ((Event){ 0, 1, dumpstep, {dumpstep_expr0}, ((int *)0), ((double *)0),
-    "wavewind.c", 493, "dumpstep"});
+    "wavewind.c", 494, "dumpstep"});
   event_register ((Event){ 0, 1, set_dtmax, {set_dtmax_expr0}, ((int *)0), ((double *)0),
     "/home/jiarongw/basilisk/src/navier-stokes/centered.h", 167, "set_dtmax"});
   event_register ((Event){ 0, 1, stability, {stability_expr0}, ((int *)0), ((double *)0),
@@ -22073,7 +22074,7 @@ void _init_solver (void) {
   event_register ((Event){ 0, 1, adapt, {adapt_expr0}, ((int *)0), ((double *)0),
     "/home/jiarongw/basilisk/src/navier-stokes/centered.h", 364, "adapt"});
   event_register ((Event){ 0, 1, adapt_0, {adapt_0_expr0}, ((int *)0), ((double *)0),
-    "wavewind.c", 506, "adapt"});
+    "wavewind.c", 507, "adapt"});
   _attribute = (_Attributes *) pcalloc (datasize/sizeof(double), sizeof (_Attributes), __func__, __FILE__, __LINE__);
   all = (scalar *) pmalloc (sizeof (scalar)*13,__func__, __FILE__, __LINE__);
   for (int i = 0; i < 12; i++)
