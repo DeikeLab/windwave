@@ -5,17 +5,17 @@
 #SBATCH --mail-user=jiarongw@princeton.edu
 
 LEVEL=11
-ak=0.15
+ak=0.05
 BO=200
 RE=40000. #40000 default
 m=8
 B=0
-UstarRATIO=1
+UstarRATIO=1.5
 
 export ScratchDir="/scratch/network/jiarongw/parameter/m${m}B${B}Ustar${UstarRATIO}ak${ak}"
 echo $ScratchDir
-rm -rf $ScratchDir
-mkdir -p $ScratchDir
+#rm -rf $ScratchDir
+#mkdir -p $ScratchDir
 cp ./wavewind_parallel $ScratchDir
 
 #SBATCH --output=${ScratchDir}/slurm.out
