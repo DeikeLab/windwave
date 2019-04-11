@@ -5,14 +5,14 @@
 #SBATCH --mail-user=jiarongw@princeton.edu
 
 LEVEL=11
-ak=0.05
-BO=200
-RE=40000. #40000 default
-m=10
+ak=0.01
+BO=3.45
+RE=31000. #40000 default
+m=5
 B=0
-UstarRATIO=1
+UstarRATIO=0.97
 
-export ScratchDir="/scratch/network/jiarongw/parameter/m${m}B${B}Ustar${UstarRATIO}ak${ak}"
+export ScratchDir="/scratch/network/jiarongw/parameter/modified_m${m}B${B}Ustar${UstarRATIO}ak${ak}Bo${BO}Re${RE}"
 echo $ScratchDir
 rm -rf $ScratchDir
 mkdir -p $ScratchDir

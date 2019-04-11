@@ -334,7 +334,7 @@ event graphs (i++) {
 	  reduction(+:keAir) reduction(+:gpeAir)) {
     double norm2 = 0.;
     foreach_dimension()
-      norm2 += sq(u.x[]);
+      norm2 += sq(u.x[]) + sq(u.y[]);
     ke += rho[]*norm2*f[]*dv();
     keAir += rho[]*norm2*(1.0-f[])*dv();
     gpe += rho1*g_*y*f[]*dv();
