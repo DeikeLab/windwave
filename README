@@ -18,3 +18,8 @@ On tiger:
 1. NOTICE: /scratch/netid only exists on the particular head node you are using.
 Must use /scratch/network/netid on adroit and /scratch/gpfs/netid on tiger.
 2. Better not to use _ when naming the directory. Still haven't figured out a good way to put the strings together.
+
+
+--------------
+04.17
+1. Modified contains the result from the new source code where the vertical kinetic energy is taken into account. Linear contains where the whole profile is set to a linear shape.

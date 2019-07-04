@@ -126,6 +126,7 @@ int main (int argc, char * argv[])
 #else
   N = 1 << LEVEL;
 #endif
+  TOLERANCE = 1e-6;
   run();
 }
 
@@ -374,10 +375,29 @@ event movies (t += 0.1) {
   /**
      We first do simple movies of the volume fraction, level of
      refinement fields. In 3D, these are in a $z=0$ cross-section. */
-
+  scalar p_air[];  // A phase averaged pressure field
+  foreach(){
+    p_air[] = p[]*(1-f[]);
+  }
   {
     static FILE * fp = POPEN ("f", "a");
     output_ppm (f, fp, min = 0, max = 1, n = 512);
+  }
+  /* { */
+  /*   static FILE * fp = POPEN ("pressure", "a"); */
+  /*   output_ppm (p_air, fp, n = 512); */
+  /* } */
+  {
+    static FILE * fp = POPEN ("pressure_normalized_2", "a");
+    output_ppm (p_air, fp, min = 0, max = +0.01, n = 512);
+  }
+  {
+    static FILE * fp = POPEN ("pressure_normalized_1", "a");
+    output_ppm (p_air, fp, min = 0, max = +0.1, n = 512);
+  }
+  {
+    static FILE * fp = POPEN ("pressure", "a");
+    output_ppm (p_air, fp, n = 512);
   }
 
 #if TREE
@@ -495,6 +515,20 @@ event dumpstep (t += k_/sqrt(g_*k_)/32) {
   char dname[100];
   sprintf (dname, "dump%g", t/(k_/sqrt(g_*k_)));
   dump (dname);
+  scalar p_air[];
+  foreach(){
+    p_air[] = p[]*(1-f[]);
+  }
+  sprintf (dname, "pressure_interpolated%g", t/(k_/sqrt(g_*k_)));
+  FILE * fp1 = fopen(dname, "w");
+  output_field({p, p_air}, fp1, n = 512, linear = true);
+  fclose (fp1);
+  sprintf (dname, "pressure_direct%g_%d", t/(k_/sqrt(g_*k_)), pid());  
+  FILE * fp2 = fopen(dname, "w");
+  foreach(){
+    fprintf (fp2, "%g,%g,%g,%g\n", x, y, p[], p_air[]);
+  }  
+  fclose (fp2);
 }
 
 /**
