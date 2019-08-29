@@ -2,3 +2,7 @@
 *.ppm
 *.out
 dump*
+slurm*
+*\~
+\_*
+\#*\#

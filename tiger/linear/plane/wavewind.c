@@ -101,7 +101,7 @@ int main (int argc, char * argv[])
   origin (-L0/2, -L0/2, -L0/2);
   periodic (right);
   u.n[top] = dirichlet(0);
-  u.t[top] = neumann(0);
+  u.t[top] = neumann(1);
 #if dimension > 2
   periodic (front);
 #endif
@@ -137,27 +137,13 @@ int main (int argc, char * argv[])
    $_k_$). */
 
 double wave (double x, double y) {
-  double a_ = ak/k_;
-  double eta1 = a_*cos(k_*x);
-  double alpa = 1./tanh(k_*h_);
-  double eta2 = 1./4.*alpa*(3.*sq(alpa) - 1.)*sq(a_)*k_*cos(2.*k_*x);
-  double eta3 = -3./8.*(cube(alpa)*alpa - 
-			3.*sq(alpa) + 3.)*cube(a_)*sq(k_)*cos(k_*x) + 
-    3./64.*(8.*cube(alpa)*cube(alpa) + 
-	    (sq(alpa) - 1.)*(sq(alpa) - 1.))*cube(a_)*sq(k_)*cos(3.*k_*x);
-  return eta1 + ak*eta2 + sq(ak)*eta3 - y;
+
+  return 0 - y;
 }
 
 double eta (double x, double y) {
-  double a_ = ak/k_;
-  double eta1 = a_*cos(k_*x);
-  double alpa = 1./tanh(k_*h_);
-  double eta2 = 1./4.*alpa*(3.*sq(alpa) - 1.)*sq(a_)*k_*cos(2.*k_*x);
-  double eta3 = -3./8.*(cube(alpa)*alpa - 
-			3.*sq(alpa) + 3.)*cube(a_)*sq(k_)*cos(k_*x) + 
-    3./64.*(8.*cube(alpa)*cube(alpa) + 
-	    (sq(alpa) - 1.)*(sq(alpa) - 1.))*cube(a_)*sq(k_)*cos(3.*k_*x);
-  return eta1 + ak*eta2 + sq(ak)*eta3;
+
+  return 0;
 }
 /**
 
@@ -190,77 +176,19 @@ event init (i = 0)
     do {
       fraction (f, wave(x,y));
 
-      /**
-	 To initialise the velocity field, we first define the potential. */
-      
-      scalar Phi[];
-      foreach() {
-      	double alpa = 1./tanh(k_*h_);
-      	double a_ = ak/k_;
-      	double sgma = sqrt(g_*k_*tanh(k_*h_)*
-      			   (1. + k_*k_*a_*a_*(9./8.*(sq(alpa) - 1.)*
-      					      (sq(alpa) - 1.) + sq(alpa))));
-      	double A_ = a_*g_/sgma;
-      	double phi1 = A_*cosh(k_*(y + h_))/cosh(k_*h_)*sin(k_*x);
-      	double phi2 = 3.*ak*A_/(8.*alpa)*(sq(alpa) - 1.)*(sq(alpa) - 1.)*
-      	  cosh(2.0*k_*(y + h_))*sin(2.0*k_*x)/cosh(2.0*k_*h_);
-      	double phi3 = 1./64.*(sq(alpa) - 1.)*(sq(alpa) + 3.)*
-      	  (9.*sq(alpa) - 13.)*cosh(3.*k_*(y + h_))/cosh(3.*k_*h_)*a_*a_*k_*k_*A_*sin(3.*k_*x);
-      	Phi[] = phi1 + ak*phi2 + ak*ak*phi3;
-      } 
-      boundary ({Phi});
-      if (DIRAC){
-	/** 
-	    We calculate the vorticity in the Dirac layer. We need a separate
-	    foreach here because we need the derivative of the potential phi.*/
-	scalar vort2[];
-	scalar psi[];
-	foreach() {
-	  vort2[] = -2.0*gaus(y,wave(x,y)+y,f[])*(Phi[1,0]-Phi[-1,0])/(2.*Delta);
-	  psi[] = 0.0;
-	}  
-     
-	boundary({vort2,psi});
-	psi[top] = dirichlet(0.);
-	psi[bottom] = dirichlet(0.);
-  
 	/**
-	   Solve the Poisson problem for the streamfunction psi given the vorticity field.*/
-	poisson(psi, vort2);
-	/**
-	   And then define the velocity field using centered-differencing
-	   of the streamfunction. */
-
-	foreach(){
-	  u.x[] = (psi[0,1] - psi[0,-1])/(2.*Delta);
-	  u.y[] = -(psi[1] - psi[-1])/(2.*Delta);
-	}
-      }
-      else{
-	/**
-	   If we choose not to use the Dirac layer, instead initialize
-	   in the water only according to the potential already calculated.*/
+	   Set velocity to zero. */
 	foreach(){
 	  foreach_dimension()
-	    u.x[] = (Phi[1] - Phi[-1])/(2.0*Delta) * f[]; // f[] is not strictly 0 or 1 I suppose
+	    u.x[] = 0; // f[] is not strictly 0 or 1 I suppose
 	}
 	foreach(){
-	  if ((y-eta(x,y))<y1){
 	    u.x[] += Udrift + sq(Ustar)/(mu2/rho2)* (y-eta(x,y)) * (1-f[]);
-	  }
-	  else{
-	    double beta = 2*Karman*Ustar/mu2*rho2*((y-eta(x,y))-y1);
-	    double alpha = log(beta+sqrt(sq(beta)+1));
-	    double tanhtemp = (exp(alpha/2)-exp(-alpha/2))/(exp(alpha/2)+exp(-alpha/2));
-	    u.x[] += (Udrift + m*Ustar + Ustar/Karman*(alpha-tanhtemp)) * (1-f[]);
-	  }
 	}
         //fprintf(stderr, "Added line running for each cell!");
         //fprintf(stderr, "Added line running!");
-      }
       boundary ((scalar *){u});  // type casting   
-    }
-
+  }
     /**
        On trees, we repeat this initialisation until mesh adaptation does
        not refine the mesh anymore. */
@@ -271,7 +199,7 @@ event init (i = 0)
 #else
     while (0);
 #endif
-  fprintf(stderr, "break3!");
+    //fprintf(stderr, "break3!");
   }
 }
 
@@ -326,8 +254,8 @@ int dissipation_rate (double* rates)
    dissipation rate as functions of the non-dimensional time. */
 
 event graphs (i++) {
-  static FILE * fpwater = fopen("budgetWaterwind.dat", "w");
-  static FILE * fpair = fopen("budgetAirwind.dat", "w");
+  static FILE * fpwater = fopen("budgetWaterwind.dat", "a");
+  static FILE * fpair = fopen("budgetAirwind.dat", "a");
   double ke = 0., gpe = 0.;
   double keAir = 0., gpeAir = 0.;
   foreach(reduction(+:ke) reduction(+:gpe) 
@@ -376,7 +304,7 @@ event movies (t += 0.1) {
      refinement fields. In 3D, these are in a $z=0$ cross-section. */
 
   {
-    static FILE * fp = POPEN ("f", "w");
+    static FILE * fp = POPEN ("f", "a");
     output_ppm (f, fp, min = 0, max = 1, n = 512);
   }
 
@@ -385,7 +313,7 @@ event movies (t += 0.1) {
     scalar l[];
     foreach()
       l[] = level;
-    static FILE * fp = POPEN ("level", "w");
+    static FILE * fp = POPEN ("level", "a");
     output_ppm (l, fp, min = 5, max = LEVEL, n = 512);
   }
 #endif
@@ -403,6 +331,7 @@ event movies (t += 0.1) {
   
   scalar omega[];
   vorticity (u, omega);
+
 #if dimension == 2
   view (width = 800, height = 600, fov = 18.8);
   clear();
@@ -438,7 +367,7 @@ event movies (t += 0.1) {
 	  draw_vof ("f");
     }
   {
-    static FILE * fp = POPEN ("below", "w");
+    static FILE * fp = POPEN ("below", "a");
     save (fp = fp);
   }
 
@@ -458,9 +387,9 @@ event movies (t += 0.1) {
 	translate (z = z)
 	  draw_vof ("f");
     }
-#endif // dimension == 3
+#endif 
   {
-    static FILE * fp = POPEN ("movie", "w");
+    static FILE * fp = POPEN ("movie", "a");
     save (fp = fp);
   }
 }
@@ -481,10 +410,14 @@ event snapshot (i += 200) {
    The wave period is `k_/sqrt(g_*k_)`. We want to run up to 2
    (alternatively 4) periods. */
 
-event end (t = 2.*k_/sqrt(g_*k_)) {
+event end (t = 40.*k_/sqrt(g_*k_)) {
   fprintf (fout, "i = %d t = %g\n", i, t);
   dump ("end");
 }
+
+
+/** 
+    ## Dump every 1/32 period.  */
 
 event dumpstep (t += k_/sqrt(g_*k_)/32) {
   char dname[100];
