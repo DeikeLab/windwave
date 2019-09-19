@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=40
-#SBATCH --time=40:00:00
+#SBATCH --time=8:00:00
 #SBATCH --mail-type=end
 #SBATCH --mail-user=jiarongw@princeton.edu
 
 
-LEVEL=10
-ak=0.025
+LEVEL=11
+ak=0.01
 BO=3.45
 RE=31000. #40000 default
 m=5

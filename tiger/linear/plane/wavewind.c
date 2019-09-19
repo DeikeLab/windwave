@@ -67,7 +67,7 @@ double m = 5.;  // vary between 5 and 8
 double B = 0.;
 double Karman = 0.41;   // Karman universal turbulence constant
 double UstarRATIO = 1;   // Ratio between Ustar and c
-
+double slope;  // Slope of linear profile
 
 
 /**
@@ -92,19 +92,6 @@ int main (int argc, char * argv[])
     UstarRATIO = atof(argv[7]);
   if (argc > 8)
     DIRAC = atof(argv[8]);
-  
-
-  /**
-     The domain is a cubic box centered on the origin and of length
-     $L0=1$, periodic in the x- and z-directions. */
-   
-  origin (-L0/2, -L0/2, -L0/2);
-  periodic (right);
-  u.n[top] = dirichlet(0);
-  u.t[top] = neumann(1);
-#if dimension > 2
-  periodic (front);
-#endif
 
   /**
      Here we set the densities and viscosities corresponding to the
@@ -116,6 +103,20 @@ int main (int argc, char * argv[])
   mu2 = 1.0/RE*MURATIO;
   f.sigma = 1./(BO*sq(k_));
   G.y = -g_;
+  double Ustar = sqrt(g_/k_)*UstarRATIO;
+  slope = sq(Ustar)/(mu2/rho2);
+
+  /**
+     The domain is a cubic box centered on the origin and of length
+     $L0=1$, periodic in the x- and z-directions. */
+   
+  origin (-L0/2, -L0/2, -L0/2);
+  periodic (right);
+  u.n[top] = dirichlet(0);
+  u.t[top] = neumann(slope); //shouldn't be 1 but the respective slope!!!
+#if dimension > 2
+  periodic (front);
+#endif
 
   /**
      When we use adaptive refinement, we start with a coarse mesh which
