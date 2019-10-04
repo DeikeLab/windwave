@@ -67,8 +67,7 @@ double m = 5.;  // vary between 5 and 8
 double B = 0.;
 double Karman = 0.41;   // Karman universal turbulence constant
 double UstarRATIO = 1;   // Ratio between Ustar and c
-double slope;  // Slope of linear profile
-double Umax;
+
 
 
 /**
@@ -93,6 +92,19 @@ int main (int argc, char * argv[])
     UstarRATIO = atof(argv[7]);
   if (argc > 8)
     DIRAC = atof(argv[8]);
+  
+
+  /**
+     The domain is a cubic box centered on the origin and of length
+     $L0=1$, periodic in the x- and z-directions. */
+   
+  origin (-L0/2, -L0/2, -L0/2);
+  periodic (right);
+  u.n[top] = dirichlet(0);
+  //  u.t[top] = neumann(0);
+#if dimension > 2
+  periodic (front);
+#endif
 
   /**
      Here we set the densities and viscosities corresponding to the
@@ -104,22 +116,6 @@ int main (int argc, char * argv[])
   mu2 = 1.0/RE*MURATIO;
   f.sigma = 1./(BO*sq(k_));
   G.y = -g_;
-  double Ustar = sqrt(g_/k_)*UstarRATIO;
-  slope = sq(Ustar)/(mu2/rho2);
-  Umax = slope*L0/2;
-
-  /**
-     The domain is a cubic box centered on the origin and of length
-     $L0=1$, periodic in the x- and z-directions. */
-   
-  origin (-L0/2, -L0/2, -L0/2);
-  periodic (right);
-  u.n[top] = dirichlet(0);
-  u.t[top] = dirichlet(Umax);
-  // u.t[top] = neumann(slope); //shouldn't be 1 but the respective slope!!!
-#if dimension > 2
-  periodic (front);
-#endif
 
   /**
      When we use adaptive refinement, we start with a coarse mesh which
@@ -141,13 +137,27 @@ int main (int argc, char * argv[])
    $_k_$). */
 
 double wave (double x, double y) {
-
-  return 0 - y;
+  double a_ = ak/k_;
+  double eta1 = a_*cos(k_*x);
+  double alpa = 1./tanh(k_*h_);
+  double eta2 = 1./4.*alpa*(3.*sq(alpa) - 1.)*sq(a_)*k_*cos(2.*k_*x);
+  double eta3 = -3./8.*(cube(alpa)*alpa - 
+			3.*sq(alpa) + 3.)*cube(a_)*sq(k_)*cos(k_*x) + 
+    3./64.*(8.*cube(alpa)*cube(alpa) + 
+	    (sq(alpa) - 1.)*(sq(alpa) - 1.))*cube(a_)*sq(k_)*cos(3.*k_*x);
+  return eta1 + ak*eta2 + sq(ak)*eta3 - y;
 }
 
 double eta (double x, double y) {
-
-  return 0;
+  double a_ = ak/k_;
+  double eta1 = a_*cos(k_*x);
+  double alpa = 1./tanh(k_*h_);
+  double eta2 = 1./4.*alpa*(3.*sq(alpa) - 1.)*sq(a_)*k_*cos(2.*k_*x);
+  double eta3 = -3./8.*(cube(alpa)*alpa - 
+			3.*sq(alpa) + 3.)*cube(a_)*sq(k_)*cos(k_*x) + 
+    3./64.*(8.*cube(alpa)*cube(alpa) + 
+	    (sq(alpa) - 1.)*(sq(alpa) - 1.))*cube(a_)*sq(k_)*cos(3.*k_*x);
+  return eta1 + ak*eta2 + sq(ak)*eta3;
 }
 /**
 
@@ -180,25 +190,75 @@ event init (i = 0)
     do {
       fraction (f, wave(x,y));
 
+      /**
+	 To initialise the velocity field, we first define the potential. */
+      
+      scalar Phi[];
+      foreach() {
+      	double alpa = 1./tanh(k_*h_);
+      	double a_ = ak/k_;
+      	double sgma = sqrt(g_*k_*tanh(k_*h_)*
+      			   (1. + k_*k_*a_*a_*(9./8.*(sq(alpa) - 1.)*
+      					      (sq(alpa) - 1.) + sq(alpa))));
+      	double A_ = a_*g_/sgma;
+      	double phi1 = A_*cosh(k_*(y + h_))/cosh(k_*h_)*sin(k_*x);
+      	double phi2 = 3.*ak*A_/(8.*alpa)*(sq(alpa) - 1.)*(sq(alpa) - 1.)*
+      	  cosh(2.0*k_*(y + h_))*sin(2.0*k_*x)/cosh(2.0*k_*h_);
+      	double phi3 = 1./64.*(sq(alpa) - 1.)*(sq(alpa) + 3.)*
+      	  (9.*sq(alpa) - 13.)*cosh(3.*k_*(y + h_))/cosh(3.*k_*h_)*a_*a_*k_*k_*A_*sin(3.*k_*x);
+      	Phi[] = phi1 + ak*phi2 + ak*ak*phi3;
+      } 
+      boundary ({Phi});
+      if (DIRAC){
+	/** 
+	    We calculate the vorticity in the Dirac layer. We need a separate
+	    foreach here because we need the derivative of the potential phi.*/
+	scalar vort2[];
+	scalar psi[];
+	foreach() {
+	  vort2[] = -2.0*gaus(y,wave(x,y)+y,f[])*(Phi[1,0]-Phi[-1,0])/(2.*Delta);
+	  psi[] = 0.0;
+	}  
+     
+	boundary({vort2,psi});
+	psi[top] = dirichlet(0.);
+	psi[bottom] = dirichlet(0.);
+  
 	/**
-	   Set velocity to zero. */
+	   Solve the Poisson problem for the streamfunction psi given the vorticity field.*/
+	poisson(psi, vort2);
+	/**
+	   And then define the velocity field using centered-differencing
+	   of the streamfunction. */
+
+	foreach(){
+	  u.x[] = (psi[0,1] - psi[0,-1])/(2.*Delta);
+	  u.y[] = -(psi[1] - psi[-1])/(2.*Delta);
+	}
+      }
+      else{
+	/**
+	   If we choose not to use the Dirac layer, instead initialize
+	   in the water only according to the potential already calculated.*/
 	foreach(){
 	  foreach_dimension()
-	    u.x[] = 0; // f[] is not strictly 0 or 1 I suppose
+	    u.x[] = (Phi[1] - Phi[-1])/(2.0*Delta) * f[]; // f[] is not strictly 0 or 1 I suppose
 	}
-	foreach(){
-	    u.x[] += Udrift + sq(Ustar)/(mu2/rho2)* (y-eta(x,y)) * (1-f[]);
-	}
+	/* foreach(){ */
+	/*     u.x[] += Udrift + sq(Ustar)/(mu2/rho2)* (y-eta(x,y)) * (1-f[]); */
+	/* } */
         //fprintf(stderr, "Added line running for each cell!");
         //fprintf(stderr, "Added line running!");
-	boundary ((scalar *){u,f});  // type casting   
-  }
+      }
+      boundary ((scalar *){u});  // type casting   
+    }
+
     /**
        On trees, we repeat this initialisation until mesh adaptation does
        not refine the mesh anymore. */
 
 #if TREE  
-    while (adapt_wavelet ({f,u},
+    while (adapt_wavelet ({f, u},
 			  (double[]){0.01,0.05,0.05,0.05}, LEVEL, 5).nf); //if not adapting anymore, return zero
 #else
     while (0);
@@ -414,7 +474,7 @@ event snapshot (i += 200) {
    The wave period is `k_/sqrt(g_*k_)`. We want to run up to 2
    (alternatively 4) periods. */
 
-event end (t = 20.*k_/sqrt(g_*k_)) {
+event end (t = 40.*2.*pi/sqrt(g_*k_)) {
   fprintf (fout, "i = %d t = %g\n", i, t);
   dump ("end");
 }
@@ -423,7 +483,7 @@ event end (t = 20.*k_/sqrt(g_*k_)) {
 /** 
     ## Dump every 1/32 period.  */
 
-event dumpstep (t += k_/sqrt(g_*k_)/128) {
+event dumpstep (t += 2.*pi/sqrt(g_*k_)/32) {
   char dname[100];
   sprintf (dname, "dump%g", t/(k_/sqrt(g_*k_)));
   dump (dname);
@@ -437,7 +497,7 @@ event dumpstep (t += k_/sqrt(g_*k_)/128) {
 
 #if TREE
 event adapt (i++) {
-  adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax}, LEVEL, 5);
+  adapt_wavelet ({f}, (double[]){femax,uemax,uemax,uemax}, LEVEL, 5);
 }
 #endif
 

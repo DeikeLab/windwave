@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=40
-#SBATCH --time=04:00:00
+#SBATCH --time=02:00:00
 #SBATCH --mail-type=end
 #SBATCH --mail-user=jiarongw@princeton.edu
 
@@ -14,13 +14,13 @@ m=5
 B=0
 UstarRATIO=0.5
 
-export ScratchDir="/scratch/gpfs/jiarongw/parameter/linear_plane_Ustar${UstarRATIO}Bo${BO}Re${RE}LEVEL${LEVEL}"
+export ScratchDir="/scratch/gpfs/jiarongw/parameter/linear_plane_test4_Ustar${UstarRATIO}Bo${BO}Re${RE}LEVEL${LEVEL}"
 echo $ScratchDir
 rm -rf $ScratchDir
 mkdir -p $ScratchDir
-cp ./wavewind_parallel $ScratchDir
+cp ./wavewind_test_dirichlet $ScratchDir
 
 #SBATCH --output=${ScratchDir}/slurm.out
 cd $ScratchDir
-srun ./wavewind_parallel $LEVEL $ak $BO $RE $m $B $UstarRATIO
+srun ./wavewind_test_dirichlet $LEVEL $ak $BO $RE $m $B $UstarRATIO
 
