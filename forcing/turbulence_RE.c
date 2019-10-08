@@ -240,6 +240,9 @@ event dumpstep (t += 1) {
   dump (dname);
 }
 
+event snapshot (i += 100) {
+  dump ("dump");
+}
 
 event adapt (i++) {
   adapt_wavelet ({f, u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, 5);

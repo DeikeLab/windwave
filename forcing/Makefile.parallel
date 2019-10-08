@@ -1,4 +1,4 @@
-OUTPUT = turbulence_setfree
+OUTPUT = turbulence_RE
 #SET FILES OF INTEREST 
 SRC_FILES = $(addsuffix .c,$(OUTPUT))
 MPI_FILES = $(addprefix _,$(SRC_FILES))

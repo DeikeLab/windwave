@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=40
-#SBATCH --time=40:00:00
+#SBATCH --time=5:00:00
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
 #SBATCH --mail-user=jiarongw@princeton.edu
 
 LEVEL=11
-ak=0.05
+ak=0.01
 BO=3.45
 RE=31000. #40000 default
 m=5
@@ -18,5 +18,5 @@ export ScratchDir="/scratch/gpfs/jiarongw/parameter/linear_m${m}B${B}Ustar${Usta
 
 #SBATCH --output=${ScratchDir}/slurm.out
 cd $ScratchDir
-cp ./dump30 ./restart
+cp ./dump5.84375 ./restart
 srun ./wavewind_parallel $LEVEL $ak $BO $RE $m $B $UstarRATIO
