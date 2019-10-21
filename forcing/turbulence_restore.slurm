@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=40
-#SBATCH --time=4:00:00
+#SBATCH --time=40:00:00
 #SBATCH --mail-type=end
 #SBATCH --mail-user=jiarongw@princeton.edu
 
@@ -18,6 +18,6 @@ cp ./turbulence_RE $ScratchDir
 
 #SBATCH --output=${ScratchDir}/slurm.out
 cd $ScratchDir
-cp ../../stopforcing/dump116 ./restart
+cp ./dump292 ./restart
 srun ./turbulence_RE ${RE} ${LEVEL} ${t_start} ${t_end}
 
