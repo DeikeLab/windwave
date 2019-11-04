@@ -181,7 +181,7 @@ event init (i = 0)
 {
 
   // calculate profile related info
-  double Ustar = sqrt(g_/k_)*UstarRATIO;
+  double Ustar = sqrt(g_/k_+f.sigma*k_)*UstarRATIO;
   double y1 = m*mu2/rho2/Ustar;
   double Udrift = B*Ustar;   
   fprintf(stderr, "UstarRATIO=%g B=%g\n m=%g ak=%g", UstarRATIO, B, m, ak);
@@ -326,7 +326,7 @@ event graphs (i++) {
 	  reduction(+:keAir) reduction(+:gpeAir)) {
     double norm2 = 0.;
     foreach_dimension()
-      norm2 += sq(u.x[]) + sq(u.y[]);
+      norm2 += sq(u.x[]);
     ke += rho[]*norm2*f[]*dv();
     keAir += rho[]*norm2*(1.0-f[])*dv();
     gpe += rho1*g_*y*f[]*dv();
