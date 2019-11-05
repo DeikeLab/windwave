@@ -3,7 +3,7 @@
 SRC_FILES = $(addsuffix .c,$(OUTPUT))
 MPI_FILES = $(addprefix _,$(SRC_FILES))
 OBJ_FILES = $(addsuffix .o,$(basename $(SRC_FILES)))
-OUT_FOLDER = $(addprefix /scratch/gpfs/f,$(OUTPUT))
+OUT_FOLDER = $(addprefix /scratch/gpfs/jiarongw/executable/f,$(OUTPUT))
 
 #SET C FLAGS AND BASILISK COMPILER, LINKING FLAGS
 CC = gcc

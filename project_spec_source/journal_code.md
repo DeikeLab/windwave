@@ -1,0 +1,1 @@
+## Major change to the source code should be logged

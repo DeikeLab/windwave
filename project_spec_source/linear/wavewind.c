@@ -13,7 +13,7 @@
 #include "reduced.h"  //reduced gravity
 #include "view.h"
 #include "tag.h"
-//#include "navier-stokes/perfs.h"
+#include "navier-stokes/perfs.h"
 //#include "grid/multigrid.h"
 
 /**
@@ -475,7 +475,7 @@ event snapshot (i += 200) {
    The wave period is `k_/sqrt(g_*k_)`. We want to run up to 2
    (alternatively 4) periods. */
 
-event end (t = 40.*2.*pi/sqrt(g_*k_)) {
+event end (t = 10.*2.*pi/sqrt(g_*k_)) {
   fprintf (fout, "i = %d t = %g\n", i, t);
   dump ("end");
 }
