@@ -13,6 +13,7 @@
 #include "reduced.h"  //reduced gravity
 #include "view.h"
 #include "tag.h"
+//#include "navier-stokes/perfs.h"
 //#include "grid/multigrid.h"
 
 /**
@@ -500,6 +501,7 @@ event adapt (i++) {
   adapt_wavelet ({f}, (double[]){femax,uemax,uemax,uemax}, LEVEL, 5);
 }
 #endif
+
 
 /**
    ## Running in parallel

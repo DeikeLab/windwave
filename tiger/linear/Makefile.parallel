@@ -1,4 +1,4 @@
-OUTPUT = wavewind
+OUTPUT = wavewind_fixedUstar
 #SET FILES OF INTEREST 
 SRC_FILES = $(addsuffix .c,$(OUTPUT))
 MPI_FILES = $(addprefix _,$(SRC_FILES))
