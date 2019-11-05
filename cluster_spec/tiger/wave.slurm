@@ -6,6 +6,9 @@
 #SBATCH --mail-type=end
 #SBATCH --mail-user=jiarongw@princeton.edu
 
+#The executable name
+EXE=wavewind
+#Parameter value
 LEVEL=11
 ak=0.05
 BO=200
@@ -14,14 +17,16 @@ m=8
 B=0
 UstarRATIO=1
 
+
 export ScratchDir="/scratch/gpfs/jiarongw/parameter/m${m}B${B}Ustar${UstarRATIO}ak${ak}RE${RE}"
 echo $ScratchDir
 #rm -rf $ScratchDir
 #mkdir -p $ScratchDir
-cp ./wavewind_parallel $ScratchDir
-
+#Copy the executable from executable directory
+cp /scratch/gpfs/executable/f$EXE/EXE $ScratchDir
 cd $ScratchDir
-srun ./wavewind_parallel $LEVEL $ak $BO $RE $m $B $UstarRATIO
+srun ./$EXE $LEVEL $ak $BO $RE $m $B $UstarRATIO
 
+#To move the whole directory to /tigress
 #cp -r $ScratchDir /tigress/jiarongw/
 #rm -rf $ScratchDir
