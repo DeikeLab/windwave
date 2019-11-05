@@ -1,4 +1,4 @@
-02.11 Trouble-shooting:
+x102.11 Trouble-shooting:
 
 On adroit:
 1. When running slurm script, run through relative path. Use srun when running parallel, otherwise it causes convergence problem. 
@@ -43,3 +43,32 @@ Also look at the dump file size to determine if it's the cause.
 
 1. Edited .bashrc to load python 2.7 automatically. Installed python package Pillow with pip install --user Pillow, so that bview client can be used on cluster.
 "you can install package without root privilege. use pip with '--user' option. Then pip install package in your '~/.local/' folder."
+
+
+
+-------------
+11.05.19
+
+1. Installed Basilisk on Della. Error when doing `cd $BASILISK/gl; make`, which also appeared on stampede2.
+
+```
+cc -g -Wall -pipe -D_FORTIFY_SOURCE=2 -O2   -c -o trackball.o trackball.c
+cc -g -Wall -pipe -D_FORTIFY_SOURCE=2 -O2 -Igl2ps -c gl2ps/gl2ps.c -o gl2ps.o
+cc -g -Wall -pipe -D_FORTIFY_SOURCE=2 -O2   -c -o utils.o utils.c
+cc -g -Wall -pipe -D_FORTIFY_SOURCE=2 -O2   -c -o polygonize.o polygonize.c
+cc -g -Wall -pipe -D_FORTIFY_SOURCE=2 -O2   -c -o og_font.o og_font.c
+cc -g -Wall -pipe -D_FORTIFY_SOURCE=2 -O2   -c -o og_stroke_mono_roman.o og_stroke_mono_roman.c
+ar cr libglutils.a trackball.o gl2ps.o utils.o polygonize.o og_font.o og_stroke_mono_roman.o
+cc -g -Wall -pipe -D_FORTIFY_SOURCE=2 -O2   -c -o fb_osmesa.o fb_osmesa.c
+ar cr libfb_osmesa.a fb_osmesa.o
+cc -g -Wall -pipe -D_FORTIFY_SOURCE=2 -O2   -c -o fb_glx.o fb_glx.c
+cc -g -Wall -pipe -D_FORTIFY_SOURCE=2 -O2   -c -o OffscreenContextGLX.o OffscreenContextGLX.c
+In file included from OffscreenContextGLX.c:53:0:
+system-gl.h:2:21: fatal error: GL/glew.h: No such file or directory
+ #include <GL/glew.h>
+                     ^
+compilation terminated.
+make: *** [OffscreenContextGLX.o] Error 1
+```
+
+2. Della and Tiger have two different versions of openmpi.
