@@ -72,3 +72,9 @@ make: *** [OffscreenContextGLX.o] Error 1
 ```
 
 2. Della and Tiger have two different versions of openmpi.
+
+------------
+11.18.19
+
+1. `pip install --user Pillow` on both adroit and della so that bview server is now good to run.
+2. Add to ./bashrc on adroit to load python 2.7 

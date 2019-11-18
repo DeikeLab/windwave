@@ -11,14 +11,14 @@ EXE=wavewind
 #Parameter value
 LEVEL=10
 ak=0.05
-BO=3.45
+BO=3.34
 RE=31000. #Default 40000
 m=8
 B=0
 UstarRATIO=0.44
 
 
-export ScratchDir="/scratch/gpfs/jiarongw/parameter/linear_m${m}B${B}Ustar${UstarRATIO}ak${ak}RE${RE}LEVEL${LEVEL}_4nodes160cores"
+export ScratchDir="/scratch/gpfs/jiarongw/parameter/linear_m${m}B${B}Ustar${UstarRATIO}ak${ak}RE${RE}BO${BO}LEVEL${LEVEL}_4nodes160cores"
 echo $ScratchDir
 rm -rf $ScratchDir
 mkdir -p $ScratchDir
