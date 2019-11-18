@@ -1,4 +1,4 @@
-x102.11 Trouble-shooting:
+02.11 Trouble-shooting:
 
 On adroit:
 1. When running slurm script, run through relative path. Use srun when running parallel, otherwise it causes convergence problem. 
