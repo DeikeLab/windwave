@@ -13,6 +13,7 @@
 #include "reduced.h"  //reduced gravity
 #include "view.h"
 #include "tag.h"
+#include "navier-stokes/perfs.h"
 //#include "grid/multigrid.h"
 
 /**
@@ -101,7 +102,7 @@ int main (int argc, char * argv[])
   origin (-L0/2, -L0/2, -L0/2);
   periodic (right);
   u.n[top] = dirichlet(0);
-  u.t[top] = neumann(1);
+  //  u.t[top] = neumann(0);
 #if dimension > 2
   periodic (front);
 #endif
@@ -128,7 +129,7 @@ int main (int argc, char * argv[])
 #endif
   run();
 }
- 
+
 /**
    ## Initial conditions
 
@@ -181,7 +182,7 @@ event init (i = 0)
 {
 
   // calculate profile related info
-  double Ustar = sqrt(g_/k_)*UstarRATIO;
+  double Ustar = sqrt(g_/k_+f.sigma*k_)*UstarRATIO;
   double y1 = m*mu2/rho2/Ustar;
   double Udrift = B*Ustar;   
   fprintf(stderr, "UstarRATIO=%g B=%g\n m=%g ak=%g", UstarRATIO, B, m, ak);
@@ -259,7 +260,7 @@ event init (i = 0)
 
 #if TREE  
     while (adapt_wavelet ({f, u},
-			  (double[]){0.01,0.05,0.05,0.05}, LEVEL, 5).nf); //if not adapting anymore, return zero
+			  (double[]){0.01,0.05,0.05,0.05}, LEVEL, 6).nf); //if not adapting anymore, return zero
 #else
     while (0);
 #endif
@@ -326,7 +327,7 @@ event graphs (i++) {
 	  reduction(+:keAir) reduction(+:gpeAir)) {
     double norm2 = 0.;
     foreach_dimension()
-      norm2 += sq(u.x[]) + sq(u.y[]);
+      norm2 += sq(u.x[]);
     ke += rho[]*norm2*f[]*dv();
     keAir += rho[]*norm2*(1.0-f[])*dv();
     gpe += rho1*g_*y*f[]*dv();
@@ -378,7 +379,7 @@ event movies (t += 0.1) {
     foreach()
       l[] = level;
     static FILE * fp = POPEN ("level", "a");
-    output_ppm (l, fp, min = 5, max = LEVEL, n = 512);
+    output_ppm (l, fp, min = 6, max = LEVEL, n = 512);
   }
 #endif
 
@@ -474,7 +475,7 @@ event snapshot (i += 200) {
    The wave period is `k_/sqrt(g_*k_)`. We want to run up to 2
    (alternatively 4) periods. */
 
-event end (t = 40.*k_/sqrt(g_*k_)) {
+event end (t = 10.*2.*pi/sqrt(g_*k_)) {
   fprintf (fout, "i = %d t = %g\n", i, t);
   dump ("end");
 }
@@ -483,7 +484,7 @@ event end (t = 40.*k_/sqrt(g_*k_)) {
 /** 
     ## Dump every 1/32 period.  */
 
-event dumpstep (t += k_/sqrt(g_*k_)/32) {
+event dumpstep (t += 2.*pi/sqrt(g_*k_)/32) {
   char dname[100];
   sprintf (dname, "dump%g", t/(k_/sqrt(g_*k_)));
   dump (dname);
@@ -497,9 +498,10 @@ event dumpstep (t += k_/sqrt(g_*k_)/32) {
 
 #if TREE
 event adapt (i++) {
-  adapt_wavelet ({f}, (double[]){femax,uemax,uemax,uemax}, LEVEL, 5);
+  adapt_wavelet ({f}, (double[]){femax,uemax,uemax,uemax}, LEVEL, 6);
 }
 #endif
+
 
 /**
    ## Running in parallel

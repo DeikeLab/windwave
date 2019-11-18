@@ -13,6 +13,7 @@
 #include "reduced.h"  //reduced gravity
 #include "view.h"
 #include "tag.h"
+#include "navier-stokes/perfs.h"
 //#include "grid/multigrid.h"
 
 /**
@@ -101,7 +102,7 @@ int main (int argc, char * argv[])
   origin (-L0/2, -L0/2, -L0/2);
   periodic (right);
   u.n[top] = dirichlet(0);
-  u.t[top] = neumann(1);
+  //  u.t[top] = neumann(0);
 #if dimension > 2
   periodic (front);
 #endif
@@ -128,7 +129,7 @@ int main (int argc, char * argv[])
 #endif
   run();
 }
- 
+
 /**
    ## Initial conditions
 
@@ -137,27 +138,11 @@ int main (int argc, char * argv[])
    $_k_$). */
 
 double wave (double x, double y) {
-  double a_ = ak/k_;
-  double eta1 = a_*cos(k_*x);
-  double alpa = 1./tanh(k_*h_);
-  double eta2 = 1./4.*alpa*(3.*sq(alpa) - 1.)*sq(a_)*k_*cos(2.*k_*x);
-  double eta3 = -3./8.*(cube(alpa)*alpa - 
-			3.*sq(alpa) + 3.)*cube(a_)*sq(k_)*cos(k_*x) + 
-    3./64.*(8.*cube(alpa)*cube(alpa) + 
-	    (sq(alpa) - 1.)*(sq(alpa) - 1.))*cube(a_)*sq(k_)*cos(3.*k_*x);
-  return eta1 + ak*eta2 + sq(ak)*eta3 - y;
+  return 0-y;
 }
 
 double eta (double x, double y) {
-  double a_ = ak/k_;
-  double eta1 = a_*cos(k_*x);
-  double alpa = 1./tanh(k_*h_);
-  double eta2 = 1./4.*alpa*(3.*sq(alpa) - 1.)*sq(a_)*k_*cos(2.*k_*x);
-  double eta3 = -3./8.*(cube(alpa)*alpa - 
-			3.*sq(alpa) + 3.)*cube(a_)*sq(k_)*cos(k_*x) + 
-    3./64.*(8.*cube(alpa)*cube(alpa) + 
-	    (sq(alpa) - 1.)*(sq(alpa) - 1.))*cube(a_)*sq(k_)*cos(3.*k_*x);
-  return eta1 + ak*eta2 + sq(ak)*eta3;
+  return 0;
 }
 /**
 
@@ -181,7 +166,7 @@ event init (i = 0)
 {
 
   // calculate profile related info
-  double Ustar = sqrt(g_/k_)*UstarRATIO;
+  double Ustar = sqrt(g_/k_+f.sigma*k_)*UstarRATIO;
   double y1 = m*mu2/rho2/Ustar;
   double Udrift = B*Ustar;   
   fprintf(stderr, "UstarRATIO=%g B=%g\n m=%g ak=%g", UstarRATIO, B, m, ak);
@@ -241,10 +226,12 @@ event init (i = 0)
 	   If we choose not to use the Dirac layer, instead initialize
 	   in the water only according to the potential already calculated.*/
 	foreach(){
-	  foreach_dimension()
-	    u.x[] = (Phi[1] - Phi[-1])/(2.0*Delta) * f[]; // f[] is not strictly 0 or 1 I suppose
+	  // Initialize the water phase velocity
+	    u.y[] = 0;
+	    u.x[] = Udrift*exp(rho2*sq(Ustar)/Udrift/mu1*y)*f[]; // f[] is not strictly 0 or 1 I suppose
 	}
 	foreach(){
+	  // Initialize the air flow
 	    u.x[] += Udrift + sq(Ustar)/(mu2/rho2)* (y-eta(x,y)) * (1-f[]);
 	}
         //fprintf(stderr, "Added line running for each cell!");
@@ -326,7 +313,7 @@ event graphs (i++) {
 	  reduction(+:keAir) reduction(+:gpeAir)) {
     double norm2 = 0.;
     foreach_dimension()
-      norm2 += sq(u.x[]) + sq(u.y[]);
+      norm2 += sq(u.x[]);
     ke += rho[]*norm2*f[]*dv();
     keAir += rho[]*norm2*(1.0-f[])*dv();
     gpe += rho1*g_*y*f[]*dv();
@@ -474,7 +461,7 @@ event snapshot (i += 200) {
    The wave period is `k_/sqrt(g_*k_)`. We want to run up to 2
    (alternatively 4) periods. */
 
-event end (t = 40.*k_/sqrt(g_*k_)) {
+event end (t = 10.*2.*pi/sqrt(g_*k_)) {
   fprintf (fout, "i = %d t = %g\n", i, t);
   dump ("end");
 }
@@ -483,7 +470,7 @@ event end (t = 40.*k_/sqrt(g_*k_)) {
 /** 
     ## Dump every 1/32 period.  */
 
-event dumpstep (t += k_/sqrt(g_*k_)/32) {
+event dumpstep (t += 2.*pi/sqrt(g_*k_)/32) {
   char dname[100];
   sprintf (dname, "dump%g", t/(k_/sqrt(g_*k_)));
   dump (dname);
@@ -500,6 +487,7 @@ event adapt (i++) {
   adapt_wavelet ({f}, (double[]){femax,uemax,uemax,uemax}, LEVEL, 5);
 }
 #endif
+
 
 /**
    ## Running in parallel
