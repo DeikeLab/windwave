@@ -138,11 +138,27 @@ int main (int argc, char * argv[])
    $_k_$). */
 
 double wave (double x, double y) {
-  return 0-y;
+  double a_ = ak/k_;
+  double eta1 = a_*cos(k_*x);
+  double alpa = 1./tanh(k_*h_);
+  double eta2 = 1./4.*alpa*(3.*sq(alpa) - 1.)*sq(a_)*k_*cos(2.*k_*x);
+  double eta3 = -3./8.*(cube(alpa)*alpa - 
+			3.*sq(alpa) + 3.)*cube(a_)*sq(k_)*cos(k_*x) + 
+    3./64.*(8.*cube(alpa)*cube(alpa) + 
+	    (sq(alpa) - 1.)*(sq(alpa) - 1.))*cube(a_)*sq(k_)*cos(3.*k_*x);
+  return eta1 + ak*eta2 + sq(ak)*eta3 - y;
 }
 
 double eta (double x, double y) {
-  return 0;
+  double a_ = ak/k_;
+  double eta1 = a_*cos(k_*x);
+  double alpa = 1./tanh(k_*h_);
+  double eta2 = 1./4.*alpa*(3.*sq(alpa) - 1.)*sq(a_)*k_*cos(2.*k_*x);
+  double eta3 = -3./8.*(cube(alpa)*alpa - 
+			3.*sq(alpa) + 3.)*cube(a_)*sq(k_)*cos(k_*x) + 
+    3./64.*(8.*cube(alpa)*cube(alpa) + 
+	    (sq(alpa) - 1.)*(sq(alpa) - 1.))*cube(a_)*sq(k_)*cos(3.*k_*x);
+  return eta1 + ak*eta2 + sq(ak)*eta3;
 }
 /**
 
@@ -226,13 +242,10 @@ event init (i = 0)
 	   If we choose not to use the Dirac layer, instead initialize
 	   in the water only according to the potential already calculated.*/
 	foreach(){
-	  // Initialize the water phase velocity
-	    u.y[] = 0;
-	    u.x[] = 0;
-	    //  u.x[] = Udrift*exp(rho2*sq(Ustar)/Udrift/mu1*y)*f[]; // f[] is not strictly 0 or 1 I suppose
+	  foreach_dimension()
+	    u.x[] = (Phi[1] - Phi[-1])/(2.0*Delta) * f[]; // f[] is not strictly 0 or 1 I suppose
 	}
 	foreach(){
-	  // Initialize the air flow
 	    u.x[] += Udrift + sq(Ustar)/(mu2/rho2)* (y-eta(x,y)) * (1-f[]);
 	}
         //fprintf(stderr, "Added line running for each cell!");
@@ -485,7 +498,7 @@ event dumpstep (t += 2.*pi/sqrt(g_*k_)/32) {
 
 #if TREE
 event adapt (i++) {
-  adapt_wavelet ({f}, (double[]){femax,uemax,uemax,uemax}, LEVEL, 5);
+  adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, LEVEL, 5);
 }
 #endif
 
