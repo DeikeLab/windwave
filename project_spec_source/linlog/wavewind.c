@@ -6,6 +6,7 @@
    taken into account using the "reduced gravity approach" and the
    results are visualised using Basilisk view. */
 
+#include "grid/multigrid.h"
 #include "navier-stokes/centered.h"
 #include "two-phase.h"
 #include "navier-stokes/conserving.h"
@@ -13,7 +14,7 @@
 #include "reduced.h"  //reduced gravity
 #include "view.h"
 #include "tag.h"
-//#include "grid/multigrid.h"
+#include "navier-stokes/perfs.h"
 
 /**
    We log some profiling information. */
@@ -101,7 +102,7 @@ int main (int argc, char * argv[])
   origin (-L0/2, -L0/2, -L0/2);
   periodic (right);
   u.n[top] = dirichlet(0);
-  u.t[top] = neumann(0);
+  //  u.t[top] = neumann(0);
 #if dimension > 2
   periodic (front);
 #endif
@@ -181,7 +182,7 @@ event init (i = 0)
 {
 
   // calculate profile related info
-  double Ustar = sqrt(g_/k_)*UstarRATIO;
+  double Ustar = sqrt(g_/k_+f.sigma*k_)*UstarRATIO;
   double y1 = m*mu2/rho2/Ustar;
   double Udrift = B*Ustar;   
   fprintf(stderr, "UstarRATIO=%g B=%g\n m=%g ak=%g", UstarRATIO, B, m, ak);
@@ -482,7 +483,7 @@ event snapshot (i += 200) {
    The wave period is `k_/sqrt(g_*k_)`. We want to run up to 2
    (alternatively 4) periods. */
 
-event end (t = 4.*k_/sqrt(g_*k_)) {
+event end (t = 10.*2.*pi/sqrt(g_*k_)) {
   fprintf (fout, "i = %d t = %g\n", i, t);
   dump ("end");
 }
@@ -491,7 +492,7 @@ event end (t = 4.*k_/sqrt(g_*k_)) {
 /** 
     ## Dump every 1/32 period.  */
 
-event dumpstep (t += k_/sqrt(g_*k_)/32) {
+event dumpstep (t += 2.*pi/sqrt(g_*k_)/32) {
   char dname[100];
   sprintf (dname, "dump%g", t/(k_/sqrt(g_*k_)));
   dump (dname);
@@ -505,9 +506,10 @@ event dumpstep (t += k_/sqrt(g_*k_)/32) {
 
 #if TREE
 event adapt (i++) {
-  adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, LEVEL, 5);
+  adapt_wavelet ({f}, (double[]){femax,uemax,uemax,uemax}, LEVEL, 5);
 }
 #endif
+
 
 /**
    ## Running in parallel
