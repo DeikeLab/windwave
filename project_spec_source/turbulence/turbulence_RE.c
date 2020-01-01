@@ -1,4 +1,4 @@
-#include "grid/octree.h"
+#include "grid/multigrid3D.h"
 #include "navier-stokes/centered.h"
 #include "two-phase.h"
 #include "navier-stokes/conserving.h"
@@ -23,8 +23,9 @@ double femax = 0.0001;
 double t_start = 10;
 double t_end = 250;
 
-#define RATIO 1.0/850.0 //density ratio, water to air
-#define MURATIO 17.4e-6/8.9e-4 //dynamic viscosity ratio, water to air
+#define RATIO 1.0/850.0 //density ratio, air to water
+#define MURATIO 17.4e-6/8.9e-4 //dynamic viscosity ratio, air to water
+// kinematic viscosity air = 16*water
 
 /**
     We need to store the variable forcing term. */
@@ -63,7 +64,7 @@ int main(int argc, char *argv[]) {
   // Give the address of av to a so that acceleration can be changed
   a = av;
 
-  init_grid (1 << (MAXLEVEL-2));
+  init_grid (1 << (MAXLEVEL));
   run();
 }
 
@@ -93,16 +94,23 @@ event init (i = 0) {
   if (!restore("restart")){
     double femax = 2e-4;
     double uemax = 2e-4;
-    do {
-      fraction (f, WaveProfile(x,z)-y);
+    fraction (f, WaveProfile(x,z)-y);
       foreach(){
         u.x[] = y;  
         u.y[] = 0.;
         u.z[] = 0.;
       }
-      boundary ((scalar *){u});
-    }
-    while (adapt_wavelet ({f,u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, MAXLEVEL-2).nf);
+    boundary ((scalar *){u});
+    /* do { */
+    /*   fraction (f, WaveProfile(x,z)-y); */
+    /*   foreach(){ */
+    /*     u.x[] = y;   */
+    /*     u.y[] = 0.; */
+    /*     u.z[] = 0.; */
+    /*   } */
+    /*   boundary ((scalar *){u}); */
+    /* } */
+    /* while (adapt_wavelet ({f,u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, MAXLEVEL-2).nf); */
   }
 }
 
@@ -128,7 +136,7 @@ event acceleration (i++) {
 /** Output video and field. */
 #  define POPEN(name, mode) fopen (name ".ppm", mode)
 
-event movies (t += 1./8.) {
+event movies (t += 1./4.) {
 
   /**
      We first do simple movies of the volume fraction, level of
@@ -192,7 +200,7 @@ event movies (t += 1./8.) {
 }
 
 
-event logfile (i+=10) {
+event logfile (i+=100) {
   coord ubar;
   foreach_dimension() {
     stats s = statsf(u.x);
@@ -222,6 +230,7 @@ event logfile (i+=10) {
            t, vd, ke, 2./3.*ke/mu1*sqrt(15.*mu1/vd));
   fprintf (fd, "%g %g %g %g\n",
            t, vd, ke, 2./3.*ke/mu1*sqrt(15.*mu1/vd));
+  fflush(fd);
 }
 
 /**
@@ -234,16 +243,13 @@ event end (t = 1000.) {
   dump ("end");
 }
 
-event dumpstep (t += 1) {
+event dumpstep (t += 10) {
   char dname[100];
   sprintf (dname, "dump%g", t);
   dump (dname);
 }
 
-event snapshot (i += 100) {
-  dump ("dump");
-}
 
-event adapt (i++) {
-  adapt_wavelet ({f, u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, 5);
-}
+/* event adapt (i++) { */
+/*   adapt_wavelet ({f, u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, 5); */
+/* } */
