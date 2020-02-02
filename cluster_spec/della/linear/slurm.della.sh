@@ -10,9 +10,9 @@
 EXE=wavewind
 #Parameter value
 LEVEL=11
-ak=0.025
+ak=0.05
 BO=3.31
-RE=20000. #Default 40000
+RE=100000. #Default 40000
 m=5
 B=0
 UstarRATIO=1

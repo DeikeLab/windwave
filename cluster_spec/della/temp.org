@@ -1,0 +1,8 @@
+* Log on wind wave project
+  ** 2020/1/29 
+  *** Tested the limited refinement given in sandbox
+  *** Submitted one adaptive linear 2D case with this new feature, one old adaptive case with loosened
+  refinement criteria, one turbulence 3D case with this new feature, resumed from t = 200 from a previous
+  case.
+
+  [ ] Ask Wouter about comment

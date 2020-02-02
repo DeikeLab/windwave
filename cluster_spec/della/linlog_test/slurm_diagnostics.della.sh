@@ -10,13 +10,13 @@
 EXE1=wavewind_linlog
 EXE2=norun_multigrid
 #Parameter value
-LEVEL=11
+LEVEL=10
 ak=0.05
 BO=3.34
 RE=31000. #Default 40000
 m=5
 B=0
-UstarRATIO=0.8
+UstarRATIO=1
 
 
 export ScratchDir="/scratch/gpfs/jiarongw/miscellaneous/linlog_m${m}B${B}Ustar${UstarRATIO}ak${ak}Bo${BO}Re${RE}LEVEL${LEVEL}"
@@ -27,7 +27,7 @@ cd $ScratchDir
 rm -r ./diagnostics
 mkdir ./diagnostics
 START=0
-END=200
+END=20
 
 
 for i in $(seq 0 $END); do

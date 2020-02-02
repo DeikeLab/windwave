@@ -5,7 +5,6 @@
    and using a momentum-conserving transport of each phase. Gravity is
    taken into account using the "reduced gravity approach" and the
    results are visualised using Basilisk view. */
-
 #include "navier-stokes/centered.h"
 #include "two-phase.h"
 #include "navier-stokes/conserving.h"
