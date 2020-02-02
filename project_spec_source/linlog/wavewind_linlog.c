@@ -17,6 +17,59 @@
 #include "navier-stokes/perfs.h"
 
 /**
+   Output pressure matrix on the run. */
+
+void output_matrix_mpi (struct OutputMatrix p)
+{
+  if (p.n == 0) p.n = N;
+  if (!p.fp) p.fp = stdout;
+  float fn = p.n, Delta = L0/fn;
+  float ** field = matrix_new (p.n, p.n, sizeof(float));
+
+  for (int i = 0; i < p.n; i++) {
+    float xp = Delta*i + X0 + Delta/2.;
+    for (int j = 0; j < p.n; j++) {
+      float yp = Delta*j + Y0 + Delta/2.;
+      if (p.linear) {
+        field[i][j] = interpolate (p.f, xp, yp);
+      }
+      else {
+        Point point = locate (xp, yp);
+        field[i][j] = point.level >= 0 ? val(p.f) : nodata;
+      }
+    }
+  }
+
+  if (pid() == 0) { // master
+@if _MPI
+    MPI_Reduce (MPI_IN_PLACE, field[0], p.n*p.n, MPI_FLOAT, MPI_MIN, 0,MPI_COMM_WORLD);
+@endif
+
+
+    fwrite (&fn, sizeof(float), 1, p.fp);
+    for (int j = 0; j < p.n; j++) {
+      float yp = Delta*j + Y0 + Delta/2.;
+      fwrite (&yp, sizeof(float), 1, p.fp);
+    }
+
+    for (int i = 0; i < p.n; i++){
+      float xp = Delta*i + X0 + Delta/2.;
+      fwrite (&xp, sizeof(float), 1, p.fp);
+      for (int j = 0; j < p.n; j++) {
+        fwrite (&field[i][j], sizeof(float), 1, p.fp);
+      }
+    }
+    fflush (p.fp);
+  }
+@if _MPI
+  else // slave
+  MPI_Reduce (field[0], NULL, p.n*p.n, MPI_FLOAT, MPI_MIN, 0,MPI_COMM_WORLD);
+@endif
+
+  matrix_free (field);
+}
+
+/**
    We log some profiling information. */
 
 // #include "navier-stokes/perfs.h"
@@ -94,6 +147,9 @@ int main (int argc, char * argv[])
   if (argc > 8)
     DIRAC = atof(argv[8]);
   
+  /** 
+      Try to dump pressure as well.  */
+  p.nodump = pf.nodump = false;
 
   /**
      The domain is a cubic box centered on the origin and of length
@@ -254,7 +310,7 @@ event init (i = 0)
 	    double alpha = log(beta+sqrt(sq(beta)+1));
 	    double tanhtemp = (exp(alpha/2)-exp(-alpha/2))/(exp(alpha/2)+exp(-alpha/2));
 	    u.x[] += (Udrift + m*Ustar + Ustar/Karman*(alpha-tanhtemp)) * (1-f[]);
-	  }
+	  } 
 	}
         //fprintf(stderr, "Added line running for each cell!");
         //fprintf(stderr, "Added line running!");
@@ -473,9 +529,9 @@ event movies (t += 0.1) {
    To be able to restart, we dump the entire simulation at regular
    intervals. */
 
-event snapshot (i += 200) {
-  dump ("dump");
-}
+/* event snapshot (i += 200) { */
+/*   dump ("dump"); */
+/* } */
 
 /**
    ## End 
@@ -495,7 +551,29 @@ event end (t = 10.*2.*pi/sqrt(g_*k_)) {
 event dumpstep (t += 2.*pi/sqrt(g_*k_)/32) {
   char dname[100];
   sprintf (dname, "dump%g", t/(k_/sqrt(g_*k_)));
+  p.nodump = false;
+  scalar p_air[],p_air_round[];
+  foreach(){
+    p_air[] = p[]*(1-f[]);
+    if (f[]<0.5){
+      p_air_round[] = p[];
+    }
+    else{
+      p_air_round[] = 0;
+    }
+  }
   dump (dname);
+  // Output pressure
+  char pressurename1[100], pressurename2[100], pressurename3[100];
+  sprintf (pressurename1, "./pressure/p_matrix%g.dat", t/(k_/sqrt(g_*k_)));
+  sprintf (pressurename2, "./pressure/p_air_matrix%g.dat", t/(k_/sqrt(g_*k_)));
+  sprintf (pressurename3, "./pressure/p_air_round_matrix%g.dat", t/(k_/sqrt(g_*k_)));
+  FILE * fpressure1 = fopen (pressurename1, "w");  
+  output_matrix_mpi (p, fpressure1, n = 512);
+  FILE * fpressure2 = fopen (pressurename2, "w");  
+  output_matrix_mpi (p_air, fpressure2, n = 512);
+  FILE * fpressure3 = fopen (pressurename3, "w");  
+  output_matrix_mpi (p_air_round, fpressure3, n = 512);
 }
 
 /**

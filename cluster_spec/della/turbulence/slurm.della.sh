@@ -1,30 +1,28 @@
 #!/bin/bash
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=20
-#SBATCH --time=10:00:00
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=16
+#SBATCH --time=08:00:00
+#SBATCH --mail-type=begin
 #SBATCH --mail-type=end
 #SBATCH --mail-user=jiarongw@princeton.edu
 
-# This is a slurm script for Della
 #The executable name
-EXE=wavewind
+EXE=turbulence_RE
 #Parameter value
-LEVEL=11
-ak=0.05
-BO=3.31
-RE=100000. #Default 40000
-m=5
-B=0
-UstarRATIO=1
+LEVEL=7
+RE=64000 #Default 40000
+START=0
+END=200
 
-export ScratchDir="/scratch/gpfs/jiarongw/parameter/linear_m${m}B${B}Ustar${UstarRATIO}ak${ak}Bo${BO}Re${RE}LEVEL${LEVEL}"
+
+export ScratchDir="/scratch/gpfs/jiarongw/turbulence/RE${RE}LEVEL${LEVEL}START${START}END${END}"
 echo $ScratchDir
 rm -rf $ScratchDir
 mkdir -p $ScratchDir
 #Copy the executable from executable directory
 cp /scratch/gpfs/jiarongw/executable/f$EXE/$EXE $ScratchDir
 cd $ScratchDir
-srun ./$EXE $LEVEL $ak $BO $RE $m $B $UstarRATIO
+srun ./$EXE $RE $LEVEL $START $END 
 
 #To move the whole directory to /tigress
 #cp -r $ScratchDir /tigress/jiarongw/

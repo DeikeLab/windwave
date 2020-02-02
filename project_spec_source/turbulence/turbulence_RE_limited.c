@@ -1,5 +1,5 @@
-#include "grid/multigrid3D.h"
-//#include "grid/octree.h"
+//#include "grid/multigrid3D.h"
+#include "grid/octree.h"
 #include "navier-stokes/centered.h"
 #include "two-phase.h"
 #include "navier-stokes/conserving.h"
@@ -9,9 +9,9 @@
 #include "tag.h"
 #include "lambda2.h"
 
-//#include "adapt_wavelet_limited.h"
+#include "adapt_wavelet_limited.h"
 
-//bool limitedAdaptation = 1;
+bool limitedAdaptation = 1;
 
 int MAXLEVEL = dimension == 2 ? 10 : 7;
 
@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
   // Give the address of av to a so that acceleration can be changed
   a = av;
 
-  init_grid (1 << (MAXLEVEL));
+  init_grid (1 << (MAXLEVEL-2));
   run();
 }
 
@@ -118,16 +118,16 @@ event init (i = 0) {
         u.z[] = 0.;
       }
     boundary ((scalar *){u});
-    /* do { */
-    /*   fraction (f, WaveProfile(x,z)-y); */
-    /*   foreach(){ */
-    /*     u.x[] = y;   */
-    /*     u.y[] = 0.; */
-    /*     u.z[] = 0.; */
-    /*   } */
-    /*   boundary ((scalar *){u}); */
-    /* } */
-    /* while (adapt_wavelet ({f,u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, MAXLEVEL-2).nf); */
+    do {
+      fraction (f, WaveProfile(x,z)-y); 
+      foreach(){ 
+	u.x[] = y;   
+        u.y[] = 0.; 
+        u.z[] = 0.;
+      } 
+      boundary ((scalar *){u});
+    } 
+    while (adapt_wavelet ({f,u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, MAXLEVEL-2).nf); 
   }
 }
 
@@ -267,10 +267,10 @@ event dumpstep (t += 10) {
 }
 
 
-//event adapt (i++) {
+event adapt (i++) {
   //adapt_wavelet ({f, u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, 5); 
-  //if(limitedAdaptation)
-//adapt_wavelet_limited ({u}, (double[]){uemax,uemax,uemax}, refRegion, 5);
-//else
-//  adapt_wavelet ({u}, (double[]){uemax,uemax,uemax}, MAXLEVEL, 5);
-// }
+  if(limitedAdaptation)
+    adapt_wavelet_limited ({f,u}, (double[]){femax,uemax,uemax,uemax}, refRegion, 5);
+  else
+    adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, MAXLEVEL, 5);
+ }
