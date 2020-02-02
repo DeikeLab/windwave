@@ -69,6 +69,7 @@ double B = 0.;
 double Karman = 0.41;   // Karman universal turbulence constant
 double UstarRATIO = 1;   // Ratio between Ustar and c
 
+double slope;
 
 
 /**
@@ -94,19 +95,6 @@ int main (int argc, char * argv[])
   if (argc > 8)
     DIRAC = atof(argv[8]);
   
-
-  /**
-     The domain is a cubic box centered on the origin and of length
-     $L0=1$, periodic in the x- and z-directions. */
-   
-  origin (-L0/2, -L0/2, -L0/2);
-  periodic (right);
-  u.n[top] = dirichlet(0);
-  //  u.t[top] = neumann(0);
-#if dimension > 2
-  periodic (front);
-#endif
-
   /**
      Here we set the densities and viscosities corresponding to the
      parameters above. Note that these variables are defined in two-phase.h already.*/
@@ -117,6 +105,22 @@ int main (int argc, char * argv[])
   mu2 = 1.0/RE*MURATIO;
   f.sigma = 1./(BO*sq(k_));
   G.y = -g_;
+
+  /**
+     The domain is a cubic box centered on the origin and of length
+     $L0=1$, periodic in the x- and z-directions. */
+   
+  origin (-L0/2, -L0/2, -L0/2);
+  periodic (right);
+  //  u.n[top] = dirichlet(0);
+  double Ustar = sqrt(g_/k_+f.sigma*k_)*UstarRATIO;
+  slope = sq(Ustar)/(mu2/rho2);
+  u.t[top] = neumann(slope);
+#if dimension > 2
+  periodic (front);
+#endif
+
+
 
   /**
      When we use adaptive refinement, we start with a coarse mesh which
@@ -497,7 +501,10 @@ event dumpstep (t += 2.*pi/sqrt(g_*k_)/32) {
    and velocity. */
 
 #if TREE
-event adapt (i++) {
+event adapt (i++, t<1) {
+  adapt_wavelet ({f}, (double[]){femax,uemax,uemax,uemax}, LEVEL, 5);
+}
+event adapt (i++, t>=1) {
   adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, LEVEL, 5);
 }
 #endif
