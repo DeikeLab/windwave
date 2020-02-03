@@ -9,7 +9,7 @@
 #The executable name
 EXE=turbulence_RE_limited
 #Parameter value
-LEVEL=5
+LEVEL=6
 RE=64000 #Default 40000
 START=0
 END=50

@@ -153,7 +153,7 @@ event acceleration (i++) {
 /** Output video and field. */
 #  define POPEN(name, mode) fopen (name ".ppm", mode)
 
-event movies (t += 1./4.) {
+event movies (t += 1.) {
 
   /**
      We first do simple movies of the volume fraction, level of
