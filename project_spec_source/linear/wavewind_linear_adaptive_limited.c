@@ -134,7 +134,7 @@ int lev;
 if( y < 0.2 )
    lev = LEVEL;
  else
-   lev = LEVEL-4;
+   lev = 6;
 return lev;
 }
 
