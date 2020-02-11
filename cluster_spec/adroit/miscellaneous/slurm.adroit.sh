@@ -9,11 +9,11 @@ EXE=wavewind_refineu
 
 LEVEL=10
 ak=0.05
-BO=13.23
+BO=3.23
 RE=31000. #40000 default
 m=5
 B=0.5
-UstarRATIO=0.8
+UstarRATIO=0.5
 
 export ScratchDir="/scratch/network/jiarongw/miscellaneous/linear_refineu_m${m}B${B}Ustar${UstarRATIO}ak${ak}Bo${BO}Re${RE}LEVEL${LEVEL}"
 echo $ScratchDir
