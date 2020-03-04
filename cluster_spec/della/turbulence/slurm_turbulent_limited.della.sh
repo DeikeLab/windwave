@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=20
-#SBATCH --time=20:00:00
+#SBATCH --time=5:00:00
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
 #SBATCH --mail-user=jiarongw@princeton.edu
@@ -9,7 +9,8 @@
 #The executable name
 EXE=turbulence_RE_limited
 #Parameter value
-LEVEL=6
+LEVEL1=8
+LEVEL2=6
 RE=64000 #Default 40000
 START=0
 END=50
@@ -21,7 +22,7 @@ rm -f $ScratchDir
 mkdir -p $ScratchDir
 cp /scratch/gpfs/jiarongw/executable/f$EXE/$EXE $ScratchDir
 cd $ScratchDir
-srun ./$EXE $RE $LEVEL $START $END 
+srun ./$EXE $RE $LEVEL1 $LEVEL2 $START $END 
 
 #To move the whole directory to /tigress
 #cp -r $ScratchDir /tigress/jiarongw/

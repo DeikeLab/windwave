@@ -13,7 +13,9 @@
 
 bool limitedAdaptation = 1;
 
-int MAXLEVEL = dimension == 2 ? 10 : 7;
+int MAXLEVEL = dimension == 2 ? 10 :7; // max level if not use limited refinement
+int MAXLEVEL1 = dimension == 2 ? 10 : 7; // max level for finer part
+int MAXLEVEL2 = dimension == 2 ? 10 : 7; // max level for coarser part
 
 double BO = 200.;
 double RE = 100.;
@@ -36,11 +38,11 @@ double t_end = 250;
 int refRegion(double x,double y, double z){
 int lev;
 if( y < 0.1 && y > 0)
-   lev = MAXLEVEL+2;
+   lev = MAXLEVEL1;
  if( y > 0.9 && y < 1)
-   lev = MAXLEVEL+2;
+   lev = MAXLEVEL1;
  else
-   lev = MAXLEVEL;
+   lev = MAXLEVEL2;
 return lev;
 }
 
@@ -53,11 +55,13 @@ int main(int argc, char *argv[]) {
   if (argc > 1)
     RE = atof (argv[1]);
   if (argc > 2)
-    MAXLEVEL = atoi(argv[2]);
+    MAXLEVEL1 = atoi(argv[2]);
   if (argc > 3)
-    t_start = atof (argv[3]);
+    MAXLEVEL2 = atoi(argv[3]);
   if (argc > 4)
-    t_end = atof (argv[4]);
+    t_start = atof (argv[4]);
+  if (argc > 5)
+    t_end = atof (argv[5]);
 
   L0 = 2 ;
   origin (-L0/2., -L0/2., -L0/2.);
