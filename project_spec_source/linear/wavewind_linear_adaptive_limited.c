@@ -466,17 +466,21 @@ event movies (t += 0.1) {
   vorticity (u, omega);
 
 #if dimension == 2
-  view (width = 800, height = 600, fov = 18.8);
+  view (width = 600, height = 600, fov = 18.8);
   clear();
 
   /**
      We repeat the drawing periodically in the x-direction. */
   
-  for (double x = -L0; x <= L0; x += L0)
-    translate (x) {
-      draw_vof ("f");
-      squares ("omega", linear = true, max=50, min=-50);
-    }
+  /* for (double x = -L0; x <= L0; x += L0) */
+  /*   translate (x) { */
+  /*     draw_vof ("f"); */
+  /*     squares ("omega", linear = true, max=50, min=-50); */
+  /*   } */
+
+  draw_vof("f");  // try not translate
+  squares("omega", linear=true);
+  squares("u.x", linear=true);
 
   /**
      This gives the following movie.
