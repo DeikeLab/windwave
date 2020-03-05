@@ -22,7 +22,7 @@ echo $ScratchDir
 cp /scratch/gpfs/jiarongw/executable/f$EXE/$EXE $ScratchDir
 cd $ScratchDir
 cp ./dump20 ./restart
-srun ./$EXE $RE $LEVEL $START $END 
+srun ./$EXE $RE $LEVEL1 $LEVEL2 $START $END 
 
 #To move the whole directory to /tigress
 #cp -r $ScratchDir /tigress/jiarongw/

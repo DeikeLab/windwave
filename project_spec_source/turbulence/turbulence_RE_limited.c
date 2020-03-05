@@ -39,7 +39,7 @@ int refRegion(double x,double y, double z){
 int lev;
 if( y < 0.1 && y > 0)
    lev = MAXLEVEL1;
- if( y > 0.9 && y < 1)
+ else if( y > 0.9 && y < 1)
    lev = MAXLEVEL1;
  else
    lev = MAXLEVEL2;
@@ -201,6 +201,13 @@ event movies (t += 1.) {
   squares ("omega", linear = true, n = {0,0,1}, alpha = 0);
   {
     static FILE * fp = POPEN ("omega", "w");
+    save (fp = fp);
+  }
+  clear();
+  squares("level");
+  cells();
+  {
+    static FILE * fp = POPEN("level", "w");
     save (fp = fp);
   }
 
