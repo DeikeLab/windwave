@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --nodes=32
+#SBATCH --nodes=16
 #SBATCH --ntasks-per-node=40
-#SBATCH --time=12:00:00
+#SBATCH --time=08:00:00
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
 #SBATCH --mail-user=jiarongw@princeton.edu
 
 #The executable name
-EXE=turbulence_uniform_forcing_weaker
+EXE=turbulence_uniform_forcing_ak000025
 #Parameter value
 LEVEL1=8
 LEVEL2=7
@@ -16,7 +16,7 @@ RE=40000 #Default 40000
 #END=50
 
 
-export ScratchDir="/scratch/gpfs/jiarongw/turbulence/uniform_forcing_weaker_test"
+export ScratchDir="/scratch/gpfs/jiarongw/turbulence/uniform_forcing_ak000025_test"
 echo $ScratchDir
 rm -f $ScratchDir
 mkdir -p $ScratchDir
