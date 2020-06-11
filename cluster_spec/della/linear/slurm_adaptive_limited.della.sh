@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=20
-#SBATCH --time=4:00:00
+#SBATCH --time=16:00:00
 #SBATCH --mail-type=end
 #SBATCH --mail-user=jiarongw@princeton.edu
 
@@ -11,7 +11,7 @@ EXE=wavewind_linear_adaptive_limited
 #Parameter value
 LEVEL=11
 ak=0.05
-BO=200
+BO=0.53
 RE=20000. #Default 40000
 m=5
 B=0

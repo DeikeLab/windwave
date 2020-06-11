@@ -11,10 +11,10 @@ CFLAGS += -source -Wall -O2 -D_MPI=1
 MPICCFLAGS += -Wall -std=c99 -O2 -D_MPI=1
 BAS=qcc
 MPICC = mpicc
-LDFLAGS = -lm -ldl
+#LDFLAGS = -lm -ldl
+LDFLAGS = -lgfortran -L${BASILISK}/ppr -lppr -lm 
 OPENGLINC = ${BASILISK}
 OPENGLIBS = -L${BASILISK}/gl -lglutils -lfb_osmesa -lGLU -lOSMesa
-
 
 #MAKE COMMAND: TAKES ARGUMENT AND MAKES EXECUTABLE IN DESIRED FOLDER
 $(OUTPUT): 
