@@ -120,7 +120,7 @@ int main(int argc, char * argv[])
     TEND = atof(argv[6]);
   if (argc > 7)
     breaking = atof(argv[7]);
-  L0 = 50.;
+  L0 = 500.;
   origin (-L0/2., -L0/2.);
   periodic (right);
   periodic (top);
@@ -135,6 +135,7 @@ int main(int argc, char * argv[])
 /**
    The intial conditions for the free-surface and velocity are given by
    the input field. */
+
 
 event init (i = 0)
 {
@@ -206,17 +207,15 @@ int first_frame = 0;
 event movie (t += 0.1; t <= TEND)
 {
   static FILE * fp = popen ("gnuplot", "w");
-  if (first_frame == 0) { 
+  if (first_frame == 0) 
     fprintf (fp, "set term pngcairo font ',9' size 1024,768;"
 	     "unset key\n"
 	     "set pm3d interpolate 4,4 lighting specular 0.6\n"
-	     "set zrange [-5:5]\n"
-	     "set cbrange [-2:2]\n"
+	     "set zrange [-50:50]\n"
+	     "set cbrange [-6:6]\n"
 	     "set xlabel 'x'\n"
 	     "set ylabel 'y'\n"
 	     );
-    first_frame = 1;
-  }
   fprintf (fp,
 	   "set output 'plot%05d.png'\n"
 	   "set title 't = %.2f'\n"

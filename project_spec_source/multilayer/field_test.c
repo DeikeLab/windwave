@@ -1,11 +1,10 @@
-
 /**
    # Field scale wave breaking (multilayer solver)
 
 */
 
 #include "grid/multigrid.h"
-#include "layered/hydro.h"
+#include "layered/hydro_test.h"
 #include "layered/nh.h"
 #include "layered/remap.h"
 #include "layered/perfs.h"
@@ -136,6 +135,7 @@ int main(int argc, char * argv[])
    The intial conditions for the free-surface and velocity are given by
    the input field. */
 
+
 event init (i = 0)
 {
   if (!restore ("restart")) {
@@ -165,7 +165,6 @@ event init (i = 0)
       sprintf (s, "w%d", ii+1);
       scalar w_temp = lookup_field (s);
       read_xy_float (filename_w, w_temp, LEVEL_data);
-      fprintf(stderr, "Read in velocity, layer index = %d!\n", ii);
     }
     foreach() {
       foreach_layer () 
@@ -179,8 +178,12 @@ event init (i = 0)
     We log the evolution of kinetic and potential energy.
 */
 
-event logfile (i++)
+event energy_before_remap (i++, last)
 {
+  if (i==10) {
+    fprintf(stderr, "energy output before remap!\n");
+    fflush(stderr);
+  }
   double ke = 0., gpe = 0.;
   foreach (reduction(+:ke) reduction(+:gpe)) {
     double zc = zb[];
@@ -193,7 +196,30 @@ event logfile (i++)
       zc += h[];
     }
   }
-  static FILE * fp = fopen("energy.dat","a");
+  static FILE * fp = fopen("energy_before_remap.dat","w");
+  fprintf (fp, "%g %g %g\n", t, ke/2., g_*gpe);
+  fflush (fp);
+}
+
+event energy_after_remap (i++, last)
+{
+  if (i==10) {
+    fprintf(stderr, "energy output after remap!\n");
+    fflush(stderr);
+  }
+  double ke = 0., gpe = 0.;
+  foreach (reduction(+:ke) reduction(+:gpe)) {
+    double zc = zb[];
+    foreach_layer () {
+      double norm2 = sq(w[]);
+      foreach_dimension()
+	norm2 += sq(u.x[]);
+      ke += norm2*h[]*dv();
+      gpe += (zc + h[]/2.)*h[]*dv();
+      zc += h[];
+    }
+  }
+  static FILE * fp = fopen("energy_after_remap.dat","w");
   fprintf (fp, "%g %g %g\n", t, ke/2., g_*gpe);
   fflush (fp);
 }
@@ -206,7 +232,7 @@ int first_frame = 0;
 event movie (t += 0.1; t <= TEND)
 {
   static FILE * fp = popen ("gnuplot", "w");
-  if (first_frame == 0) { 
+  if (first_frame == 0) {
     fprintf (fp, "set term pngcairo font ',9' size 1024,768;"
 	     "unset key\n"
 	     "set pm3d interpolate 4,4 lighting specular 0.6\n"
@@ -277,5 +303,4 @@ event dumpstep (t += 1) {
   sprintf (dname, "dump%g", t);
   dump (dname);
 }
-
 
