@@ -355,7 +355,7 @@ event acceleration (i++) {
   /**
      Forcing term equivalent to pressure gradient in x. */
   foreach_face(x)
-    av.x[] += amp_force;
+    av.x[] += amp_force*(1-f[]);
 }
 
 
