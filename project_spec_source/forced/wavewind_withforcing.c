@@ -140,7 +140,7 @@ scalar pair[], pairdiff[];
 
 int refRegion(double x,double y, double z){
 int lev;
-if( y < 0.2*L0 )
+if( y < 0.2 )
    lev = LEVEL;
  else
    lev = LEVEL-4;
@@ -331,23 +331,11 @@ event init (i = 0)
 	}
 	/**
 	   Superimpose the air velocity on top. */
-	/* double h_local = 0.5; */
-	/* foreach(){ */
-	/*   h_local = L0/2. - eta(x,0); // This or just 0.5? */
-	/*   u.x[] += (1-f[])*amp_force*sq(h_local)/(2.*(mu2/rho2))*(1-sq((y-L0/2.)/h_local)); */
-	/* } */
-      foreach(){
-	if ((y-eta(x,y))<y_1){
-	  u.x[] += Udrift + sq(Ustar)/(mu2/rho2)* (y-eta(x,y)) * (1-f[]);
+	double h_local = 0.5;
+	foreach(){
+	  h_local = L0/2. - eta(x,0); // This or just 0.5?
+	  u.x[] += (1-f[])*amp_force*sq(h_local)/(2.*(mu2/rho2))*(1-sq((y-L0/2.)/h_local));
 	}
-	else{
-	  double beta = 2*Karman*Ustar/mu2*rho2*((y-eta(x,y))-y_1);
-	  double alpha = log(beta+sqrt(sq(beta)+1));
-	  double tanhtemp = (exp(alpha/2)-exp(-alpha/2))/(exp(alpha/2)+exp(-alpha/2));
-	  u.x[] += (Udrift + m*Ustar + Ustar/Karman*(alpha-tanhtemp)) * (1-f[]);
-	}
-      }
-
       }
       boundary ((scalar *){u});  // type casting   
     }

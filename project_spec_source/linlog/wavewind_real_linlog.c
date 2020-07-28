@@ -82,7 +82,7 @@ void output_matrix_mpi (struct OutputMatrix p)
 
 double ak = 0.05;
 double BO = 200.;
-double RE = 40000.;
+double REw = 40000., REa = 0;
 
 /**
    The default maximum level of refinement depends on the dimension. */
@@ -107,18 +107,15 @@ double MURATIO = (17.4e-6/8.9e-4);
 int DIRAC = 0;
 
 /**
-   Define the velocity output file number. */
-int countvelocity = 0;
-
-/**
    The wave number, fluid depth and acceleration of gravity are set to
    these values. */
 double k_ = 2.*pi;
 double h_ = 0.5;
-double g_ = 1.;
+double g_ = 9.8;
 double T0;
 double c_;
 int Nwave = 1;
+double gpe_base = 0;
 
 /** define the wind profile related parameters. */
 
@@ -137,10 +134,10 @@ scalar uwater[];
 scalar pair[], pairdiff[];
 
 
-
+double REGION = 0.2;
 int refRegion(double x,double y, double z){
 int lev;
-if( y < 0.2*L0 )
+if( y < REGION*L0 )
    lev = LEVEL;
  else
    lev = LEVEL-4;
@@ -163,42 +160,48 @@ int main (int argc, char * argv[])
   if (argc > 2)
     ak = atof(argv[2]);
   if (argc > 3)
-    BO = atof(argv[3]);
+    UstarRATIO = atof(argv[3]);
   if (argc > 4)
-    RE = atof(argv[4]);   
+    Nwave = atoi(argv[4]);
   if (argc > 5)
-    UstarRATIO = atof(argv[5]);
+    L0 = atof(argv[5]);
   if (argc > 6)
-    Nwave = atoi(argv[6]);
-  if (argc > 7)
-    g_ = atof(argv[7]);
-  if (argc > 8)
-    TEND = atof(argv[8]);
+    TEND = atof(argv[6]);
+  if (argc > 7) 
+    REGION = atof(argv[7]);
 
   /**
      Here we set the densities and viscosities corresponding to the
      parameters above. Note that these variables are defined in two-phase.h already.*/
-  rho1 = 1.;
+  h_ = L0/2.;
+  k_ = 2.*pi*(Nwave/L0);  
+  rho1 = 1000.;
   rho2 = rho1*RATIO;
-  k_ = 2.*pi*Nwave;  
-  f.sigma = g_/(BO*sq(k_));  
+  mu1 = 8.9e-4;
+  mu2 = mu1*MURATIO;
+  f.sigma = 0.074;
+  BO = (rho1-rho2)*g_/sq(k_)/f.sigma; // Defined with k instead of lambda
   c_ = sqrt(g_/k_+f.sigma/rho1*k_);
   T0 = 2.*pi/sqrt(g_*k_+f.sigma/rho1*sq(k_)*k_);
-  mu1 = (2*pi/k_)*c_/RE; //using wavelength as length scale
-  mu2 = mu1*MURATIO;
-  G.y = -g_;  
-  a = av;
-  fprintf(stderr, "rho1 = %g, rho2 = %g, mu1 = %g, mu2 = %g, sigma = %g \n", rho1, rho2, mu1, mu2, f.sigma);
-  /**
-     The domain is a cubic box centered on the origin and of length
-     $L0=1$, periodic in the x- and z-directions. */
-  
+  REw = rho1*c_*(2.*pi/k_)/mu1;
   Ustar = c_*UstarRATIO;
   Utop = sq(Ustar)/(mu2/rho2)*L0/2.;
   y_1 = m*mu2/rho2/Ustar;
-  Udrift = B*Ustar;  
+  Udrift = B*Ustar;
   amp_force = sq(Ustar)/(L0/2.);
+#if dimension == 2
+  gpe_base = -0.5*sq(h_)*L0*g_;
+#else
+  gpe_base = -0.5*sq(h_)*sq(L0)*g_;
+#endif
+  REa = rho2*Ustar*h_/mu2;
+  fprintf(stderr, "k = %g, BO = %g, REw = %g, REa = %g \n", k_, BO, REw, REa);
   fprintf(stderr, "a = %g \n", amp_force);
+  G.y = -g_;  
+  a = av;  
+  /**
+     The domain is a cubic box centered on the origin and of length
+     $L0=1$, periodic in the x- and z-directions. */
   origin (-L0/2, -L0/2, -L0/2);
   periodic (right);
   u.n[top] = dirichlet(0);
@@ -249,20 +252,6 @@ double eta (double x, double y) {
 	    (sq(alpa) - 1.)*(sq(alpa) - 1.))*cube(a_)*sq(k_)*cos(3.*k_*x);
   return eta1 + ak*eta2 + sq(ak)*eta3;
 }
-/**
-
-   We also calculate an approximation to a Dirac distribution on the wave surface.
-   This allows us to calculate a vortex sheet on the surface to provide a boundary
-   layer in the air above the water surface. */
-
-double gaus (double y, double yc, double T){
-  double deltaw = sqrt(2.0/RE)/k_;
-  double deltaa = sqrt(2.0/RE*MURATIO/RATIO)/k_;
-  double r = y - yc;
-  return 2.0/(sqrt(2.0*pi*sq(deltaa)) + sqrt(2.0*pi*sq(deltaw))) *
-    (T*exp(-sq(r)/(2.0*sq(deltaw))) + (1.0 - T)*exp(-sq(r)/(2.0*sq(deltaa))));
-}
-
 
 /**
    We either restart (if a "restart" file exists), or initialise the wave
@@ -294,48 +283,17 @@ event init (i = 0)
       	Phi[] = phi1 + ak*phi2 + ak*ak*phi3;
       } 
       boundary ({Phi});
-      if (DIRAC){
-	/** 
-	    We calculate the vorticity in the Dirac layer. We need a separate
-	    foreach here because we need the derivative of the potential phi.*/
-	scalar vort2[];
-	scalar psi[];
-	foreach() {
-	  vort2[] = -2.0*gaus(y,wave(x,y)+y,f[])*(Phi[1,0]-Phi[-1,0])/(2.*Delta);
-	  psi[] = 0.0;
-	}  
-     
-	boundary({vort2,psi});
-	psi[top] = dirichlet(0.);
-	psi[bottom] = dirichlet(0.);
-  
-	/**
-	   Solve the Poisson problem for the streamfunction psi given the vorticity field.*/
-	poisson(psi, vort2);
-	/**
-	   And then define the velocity field using centered-differencing
-	   of the streamfunction. */
-
-	foreach(){
-	  u.x[] = (psi[0,1] - psi[0,-1])/(2.*Delta);
-	  u.y[] = -(psi[1] - psi[-1])/(2.*Delta);
-	}
+      foreach(){
+	foreach_dimension()
+	  u.x[] = (Phi[1] - Phi[-1])/(2.0*Delta) * f[]; // f[] is not strictly 0 or 1 I suppose
       }
-      else{
-	/**
-	   If we choose not to use the Dirac layer, instead initialize
-	   in the water only according to the potential already calculated.*/
-	foreach(){
-	  foreach_dimension()
-	    u.x[] = (Phi[1] - Phi[-1])/(2.0*Delta) * f[]; // f[] is not strictly 0 or 1 I suppose
-	}
-	/**
-	   Superimpose the air velocity on top. */
-	/* double h_local = 0.5; */
-	/* foreach(){ */
-	/*   h_local = L0/2. - eta(x,0); // This or just 0.5? */
-	/*   u.x[] += (1-f[])*amp_force*sq(h_local)/(2.*(mu2/rho2))*(1-sq((y-L0/2.)/h_local)); */
-	/* } */
+      /**
+	 Superimpose the air velocity on top. */
+      /* double h_local = 0.5; */
+      /* foreach(){ */
+      /* 	h_local = L0/2. - eta(x,0); // This or just 0.5? */
+      /* 	u.x[] += (1-f[])*amp_force*sq(h_local)/(2.*(mu2/rho2))*(1-sq((y-L0/2.)/h_local)); */
+      /* } */
       foreach(){
 	if ((y-eta(x,y))<y_1){
 	  u.x[] += Udrift + sq(Ustar)/(mu2/rho2)* (y-eta(x,y)) * (1-f[]);
@@ -347,11 +305,8 @@ event init (i = 0)
 	  u.x[] += (Udrift + m*Ustar + Ustar/Karman*(alpha-tanhtemp)) * (1-f[]);
 	}
       }
-
-      }
       boundary ((scalar *){u});  // type casting   
     }
-
     /**
        On trees, we repeat this initialisation until mesh adaptation does
        not refine the mesh anymore. */
@@ -362,7 +317,6 @@ event init (i = 0)
 #else
     while (0);
 #endif
-    //fprintf(stderr, "break3!");
   }
 }
 
@@ -453,9 +407,9 @@ event graphs (i+=10) {
     fprintf (fpair, "t ke gpe dissipation\n");
   }
   fprintf (fpwater, "%g %g %g %g\n",
-	   t, ke/2., gpe + 0.125, dissWater);
+	   t, ke/2., gpe - gpe_base*rho1, dissWater);
   fprintf (fpair, "%g %g %g %g\n",
-	   t, keAir/2., gpeAir + 0.125, dissAir);
+	   t, keAir/2., gpeAir - gpe_base*rho2, dissAir);
 }
 
 /**

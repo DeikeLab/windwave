@@ -30,14 +30,11 @@ double kp_ = 2.*pi/10.;
 double P_ = 0.01;
 int N_power_ = 5;
 #define N_mode_ 16
-double F_kxky_[N_mode_*(N_mode_+1)], omega[N_mode_*(N_mode_+1)], phase[N_mode_*(N_mode_+1)];
+double F_kxky_[N_mode_*(N_mode_+1)], omega[N_mode_*(N_mode_+1)], phase[N_mode_*(N_mode_+1)]; // One more node for ky_
 double kx_[N_mode_], ky_[N_mode_+1];
 double dkx_, dky_;
-
-double randInRange(int min, int max)
-{
-  return min + (rand() / (double) (RAND_MAX) * (max - min + 1));
-}
+// Focusing time and place
+double xb_ = 0, yb_ = 0, tb_ = 40;
 
 void power_input () {
   for (int i=0; i<N_mode_; i++) {
@@ -49,36 +46,7 @@ void power_input () {
   dky_ = ky_[1]-ky_[0];
   // A function that reads in F_kxky_. Next step is to generate F_kxky_ all inside
 #if _MPI 
-  /* MPI_Win win; */
-  /* float * a; */
-  /* if (pid() == 0){ */
-  /*   MPI_Win_allocate_shared (size*sizeof(float), sizeof(float), MPI_INFO_NULL, MPI_COMM_WORLD, &a, &win); */
-  /* } */
-  /* else{ // Slaves obtain the location of the pid()=0 allocated array     */
-  /*   int disp_unit; */
-  /*   MPI_Aint  ssize;  */
-  /*   MPI_Win_allocate_shared (0, sizeof(float), MPI_INFO_NULL,MPI_COMM_WORLD, &a, &win); */
-  /*   MPI_Win_shared_query (win, 0, &ssize, &disp_unit, &a); */
-  /* } */
-  /* MPI_Barrier (MPI_COMM_WORLD); */
-  /* if (pid() == 0){  */
-  /*   MPI_Win_lock (MPI_LOCK_EXCLUSIVE, 0, MPI_MODE_NOCHECK, win); */
-  /*   FILE * fp = fopen (fname, "rb"); */
-  /*   fread (a, sizeof(float), size,fp); */
-  /*   MPI_Win_unlock (0, win); */
-  /* } */
-  /* MPI_Barrier (MPI_COMM_WORLD); */
-
-  /* MPI_File fh; */
-  /* char filename[100]; */
-  /* sprintf (filename, "F_kxky"); */
-  /* MPI_File_open(MPI_COMM_SELF, filename, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh); */
-  /* int size = N_mode_*N_mode_; */
-  /* float * a = (float*) malloc (sizeof(float)*size); */
-  /* MPI_FILE_read(&fh, a, size, MPI_FLOAT);  */
-  /* MPI_File_close(&fh); */
-
-  int length = N_mode_*N_mode_;
+  int length = N_mode_*(N_mode_+1);
   char message[20];
   int  i, rank, size;
   MPI_Status status;
@@ -86,7 +54,7 @@ void power_input () {
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   if (rank == root) {
-    int length = N_mode_*N_mode_;
+    int length = N_mode_*(N_mode_+1);
     float * a = (float*) malloc (sizeof(float)*length);
     char filename[100];
     sprintf (filename, "F_kxky");
@@ -100,15 +68,22 @@ void power_input () {
     // Phase and omega, next focusing phase
     double kmod = 0;
     int index = 0;
-    srand(0);
     for (int i=0; i<N_mode_;i++) {
-      for (int j=0;j<N_mode_;j++) {
-	index = j*N_mode_ + i;
-	kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
-	omega[index] = sqrt(g_*kmod);
-	phase[index] = randInRange (0, 2.*pi);
+      for (int j=0;j<(N_mode_+1);j++) {
+    	index = j*N_mode_ + i;
+    	kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
+    	omega[index] = sqrt(g_*kmod);
+    	phase[index] = - kx_[i]*xb_ - ky_[j]*yb_ + omega[index]*tb_;
       }
     }
+    /* for (int j=0; j<(N_mode_+1); j++) { */
+    /*   for (int i=0; i<N_mode_; i++) { */
+    /* 	index = i*N_mode_ + j; */
+    /* 	kmod = sqrt(sq(kx_[i]) + sq(ky_[j])); */
+    /* 	omega[index] = sqrt(g_*kmod); */
+    /* 	phase[index] = - kx_[i]*xb_ - ky_[j]*yb_ + omega[index]*tb_; */
+    /*   } */
+    /* } */
   }
   MPI_Bcast(&F_kxky_, length, MPI_DOUBLE, root, MPI_COMM_WORLD);
   MPI_Bcast(&omega, length, MPI_DOUBLE, root, MPI_COMM_WORLD);
@@ -126,7 +101,7 @@ void power_input () {
     fprintf (fout, "%g ", phase[i]);
   fclose (fout);
 #else
-  int length = N_mode_*N_mode_;
+  int length = N_mode_*(N_mode_+1);
   float * a = (float*) malloc (sizeof(float)*length);
   char filename[100];
   sprintf (filename, "F_kxky");
@@ -145,14 +120,13 @@ void power_input () {
   fclose (fout);
   // Phase and omega, next focusing phase
   double kmod = 0;
-  int index = 0;
-  srand(0); 
+  int index = 0; 
   for (int i=0; i<N_mode_;i++) {
-    for (int j=0;j<N_mode_;j++) {
+    for (int j=0;j<(N_mode_+1);j++) {
       index = j*N_mode_ + i;
       kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
       omega[index] = sqrt(g_*kmod);
-      phase[index] = randInRange (0, 2.*pi);
+      phase[index] = -kx_[i]*xb_ + -ky_[j]*yb_ + omega[index]*tb_;
     }
   }
 #endif
@@ -257,7 +231,7 @@ int main(int argc, char * argv[])
   gpe_base = -0.5*sq(h_)*L0*g_;
 #endif
   CFL_H = 1; // Smaller time step
-  max_slope = 0.8;
+  //  max_slope = 1.;
   run();
 }
 
@@ -343,6 +317,8 @@ event energy_after_remap (i++, last)
 event movie (t += 0.1; t <= TEND)
 {
   char s[80];
+  sprintf (s, "u%d", nl-1);
+  vector u_temp = lookup_vector (s);
   view (fov = 20, quat = {0.475152,0.161235,0.235565,0.832313}, width = 800, height = 600);
   sprintf (s, "t = %.2f", t);
   draw_string (s, size = 30);
@@ -371,8 +347,6 @@ event movie (t += 0.1; t <= TEND)
   // Might need to change to mpi function later
   output_matrix_mpi (eta, feta, N, linear = true);
   fclose (feta);
-  sprintf (s, "u%d", nl-1);
-  vector u_temp = lookup_vector (s);
   FILE * fux = fopen (filename2, "w");
   output_matrix_mpi (u_temp.x, fux, N, linear = true);
   fclose (fux);

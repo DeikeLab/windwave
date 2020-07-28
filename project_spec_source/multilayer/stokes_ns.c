@@ -413,26 +413,26 @@ ffmpeg). */
 #else
 #  define POPEN(name, mode) popen ("ppm2mp4 > " name ".mp4", mode)
 #endif
-event movies (t += 0.01*k_/sqrt(g_*k_)) {
+event movies (t += 0.1*k_/sqrt(g_*k_)) {
 
-  /**
-  We first do simple movies of the volume fraction, level of
-  refinement fields. In 3D, these are in a $z=0$ cross-section. */
+/*   /\** */
+/*   We first do simple movies of the volume fraction, level of */
+/*   refinement fields. In 3D, these are in a $z=0$ cross-section. *\/ */
 
-  {
-    static FILE * fp = POPEN ("f", "w");
-    output_ppm (f, fp, min = 0, max = 1, n = 512);
-  }
+/*   { */
+/*     static FILE * fp = POPEN ("f", "w"); */
+/*     output_ppm (f, fp, min = 0, max = 1, n = 512); */
+/*   } */
 
-#if TREE
-  {
-    scalar l[];
-    foreach()
-      l[] = level;
-    static FILE * fp = POPEN ("level", "w");
-    output_ppm (l, fp, min = 5, max = LEVEL, n = 512);
-  }
-#endif
+/* #if TREE */
+/*   { */
+/*     scalar l[]; */
+/*     foreach() */
+/*       l[] = level; */
+/*     static FILE * fp = POPEN ("level", "w"); */
+/*     output_ppm (l, fp, min = 5, max = LEVEL, n = 512); */
+/*   } */
+/* #endif */
 
   /**
   <p><center>
@@ -471,45 +471,26 @@ event movies (t += 0.01*k_/sqrt(g_*k_)) {
 #else // dimension == 3
   /**
   In 3D, we generate a first movie seen from below. */
-  
-  view (width = 1600, height = 1200, theta = pi/4, phi = -pi/6, fov = 20);
+  view (width = 800, height = 600, theta = pi/4, phi = pi/6, fov = 20, bg = {255,255,255});  
+  //view (width = 1600, height = 1200, theta = pi/4, phi = -pi/6, fov = 20);
   clear();
   char s[80];
   sprintf (s, "t = %.2f T0", t/(k_/sqrt(g_*k_)));
-  draw_string (s, size = 80);
+  draw_string (s, size = 100);
   for (double x = -2*L0; x <= L0; x += L0)
     translate (x) {
-      squares ("omega", linear = true, n = {0,0,1}, alpha = -L0/2);
+      isosurface("f", 0.5, color = "u.x", min = -0.15, max = 0.6);
+      draw_vof ("f", larger = 1.2, color = "u.x", linear = true, min = -0.15, max = 0.6);
+      /* squares ("omega", linear = true, n = {0,0,1}, alpha = -L0/2); */
 /*       for (double z = -3*L0; z <= L0; z += L0) */
 /* translate (z = z) */
-  draw_vof ("f");
+  /* draw_vof ("f"); */
     }
-  {
-    static FILE * fp = POPEN ("below", "w");
-    save (fp = fp);
-  }
-
-  /**
-  And a second movie, seen from above. */
-  
-  view (width = 1600, height = 1200, theta = pi/4, phi = pi/6, fov = 20);
-  clear();
-
-  /**
-  In 3D, we are doubly-periodic (along x and z). */
-  
-  for (double x = -2*L0; x <= L0; x += L0)
-    translate (x) {
-      squares ("omega", linear = true, n = {0,0,1}, alpha = -L0/2);
-      for (double z = -3*L0; z <= L0; z += L0)
-translate (z = z)
-  draw_vof ("f");
-    }
-#endif // dimension == 3
   {
     static FILE * fp = POPEN ("movie", "w");
     save (fp = fp);
   }
+#endif // dimension == 3
 }
 
 /**
@@ -530,7 +511,7 @@ event snapshot_dt (t += 0.1*k_/sqrt(g_*k_)) {
 The wave period is `k_/sqrt(g_*k_)`. We want to run up to 2
 (alternatively 4) periods. */
 
-event end (t = 4.*k_/sqrt(g_*k_)) {
+event end (t = 10.*k_/sqrt(g_*k_)) {
   fprintf (fout, "i = %d t = %g\n", i, t);
   dump ("end");
 }

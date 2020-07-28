@@ -7,8 +7,8 @@ OUT_FOLDER = $(addprefix /scratch/gpfs/jiarongw/executable/f,$(OUTPUT))
 
 #SET C FLAGS AND BASILISK COMPILER, LINKING FLAGS
 CC = gcc
-CFLAGS += -source -Wall -O2 -D_MPI=1 -DLAYERS=1
-MPICCFLAGS += -Wall -std=c99 -O2 -D_MPI=1 -DLAYERS=1
+CFLAGS += -source -Wall -O2 -D_MPI=1 
+MPICCFLAGS += -Wall -std=c99 -O2 -D_MPI=1 
 BAS=qcc
 MPICC = mpicc
 #LDFLAGS = -lm -ldl

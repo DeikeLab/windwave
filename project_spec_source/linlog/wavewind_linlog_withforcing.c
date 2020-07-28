@@ -139,11 +139,6 @@ return lev;
 }
 
 /**
-    We need to store the variable forcing term. */
-double amp_force = 0.1; //amplitude of the forcing
-face vector av[];
-
-/**
    The program takes optional arguments which are the level of
    refinement, steepness, Bond and Reynolds numbers. */
 
@@ -176,7 +171,6 @@ int main (int argc, char * argv[])
   mu2 = 1.0/RE*MURATIO;
   f.sigma = 1./(BO*sq(k_));
   G.y = -g_;  
-  a = av;
 
   /**
      The domain is a cubic box centered on the origin and of length
@@ -186,8 +180,7 @@ int main (int argc, char * argv[])
   Utop = sq(Ustar)/(mu2/rho2)*L0/2.;
   y_1 = m*mu2/rho2/Ustar;
   Udrift = B*Ustar;  
-  amp_force = sq(Ustar)/(L0/2.);
-  fprintf(stderr, "a = %g \n", amp_force);
+
   origin (-L0/2, -L0/2, -L0/2);
   periodic (right);
   u.n[top] = dirichlet(0);
@@ -350,14 +343,6 @@ event init (i = 0)
     //fprintf(stderr, "break3!");
   }
 }
-
-event acceleration (i++) {
-  /**
-     Forcing term equivalent to pressure gradient in x. */
-  foreach_face(x)
-    av.x[] += amp_force*(1-f[]);
-}
-
 
 /**
    ## Outputs
