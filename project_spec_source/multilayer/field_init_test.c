@@ -39,7 +39,7 @@ double randInRange(int min, int max)
   return min + (rand() / (double) (RAND_MAX) * (max - min + 1));
 }
 
-void power_input () {
+void power_input() {
   for (int i=0; i<N_mode_; i++) {
     kx_[i] = 2.*pi/L0*(i+1);
     ky_[i] = 2.*pi/L0*(i-N_mode_/2);
@@ -100,7 +100,7 @@ void power_input () {
     // Phase and omega, next focusing phase
     double kmod = 0;
     int index = 0;
-    srand(0);
+    srand(4); // We can seed it differently for different runs
     for (int i=0; i<N_mode_;i++) {
       for (int j=0;j<N_mode_;j++) {
 	index = j*N_mode_ + i;
@@ -257,7 +257,7 @@ int main(int argc, char * argv[])
   gpe_base = -0.5*sq(h_)*L0*g_;
 #endif
   CFL_H = 1; // Smaller time step
-  max_slope = 0.8;
+  // max_slope = 0.8;
   run();
 }
 

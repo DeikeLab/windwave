@@ -5,9 +5,6 @@
     the same across x position. */
 
 #include "navier-stokes/centered.h"
-scalar pos[];
-double Ustar;
-#define mu(f,pos,y)  (clamp(f,0.,1.)*(mu1 - mu2) + mu2)+0.41*Ustar*(y-pos)
 #include "two-phase.h"
 #include "navier-stokes/conserving.h"
 #include "tension.h"
@@ -16,6 +13,7 @@ double Ustar;
 #include "tag.h"
 #include "navier-stokes/perfs.h"
 #include "adapt_wavelet_limited.h"
+#include "sandbox/frac-dist.h"
 
 bool limitedAdaptation = 1;
 
@@ -126,9 +124,7 @@ double m = 5.;  // vary between 5 and 8
 double B = 0.;
 double Karman = 0.41;   // Karman universal turbulence constant
 double UstarRATIO = 1;   // Ratio between Ustar and c
-double Utop;
-double y_1;
-double Udrift;   
+double Utop, Ustar, Udrift, y_1;
 double TEND = 10;
 
 scalar omega[];
@@ -138,12 +134,12 @@ scalar pair[], pairdiff[];
 
 double REGION = 0.2;
 int refRegion(double x,double y, double z){
-int lev;
-if( y < REGION*L0 )
-   lev = LEVEL;
- else
-   lev = LEVEL-4;
-return lev;
+  int lev;
+  if( y < REGION*L0 )
+    lev = LEVEL;
+  else
+    lev = LEVEL-2;
+  return lev;
 }
 
 /**
@@ -320,12 +316,6 @@ event init (i = 0)
     while (0);
 #endif
   }
-#if dimension == 2   
-  coord G = {0.,1.}, Z = {0.,0.};
-#else
-  coord G = {0.,1.,0.}, Z = {0.,0.,0.};
-#endif
-  position (f, pos, G, Z);
 }
 
 event acceleration (i++) {
@@ -333,13 +323,107 @@ event acceleration (i++) {
      Forcing term equivalent to pressure gradient in x. */
   foreach_face(x)
     av.x[] += amp_force*(1-f[]);
-#if dimension == 2   
-  coord G = {0.,1.}, Z = {0.,0.};
-#else
-  coord G = {0.,1.,0.}, Z = {0.,0.,0.};
+#if DEBUG
+  if (i == 5) {
+    char message[100];
+    sprintf (message, "before-%d", pid());
+    FILE * fp = fopen (message, "w");
+    foreach () {
+      if (y > REGION*L0)
+	fprintf (fp, "y = %g, x = %g, pid = %d, mu = %g\n", y, x, pid(), (mu.y[0,0]+mu.y[0,1])/2);
+    }
+    fclose (fp);
+  }
 #endif
-  position (f, pos, G, Z);
 }
+
+scalar Evis[];
+// scalar fair[];
+scalar dist[];
+event properties(i++){
+// From two-phase.h
+#ifndef sf
+#if dimension <= 2
+  foreach()
+    sf[] = (4.*f[] + 
+	    2.*(f[0,1] + f[0,-1] + f[1,0] + f[-1,0]) +
+	    f[-1,-1] + f[1,-1] + f[1,1] + f[-1,1])/16.;
+#else // dimension == 3
+  foreach()
+    sf[] = (8.*f[] +
+	    4.*(f[-1] + f[1] + f[0,1] + f[0,-1] + f[0,0,1] + f[0,0,-1]) +
+	    2.*(f[-1,1] + f[-1,0,1] + f[-1,0,-1] + f[-1,-1] + 
+		f[0,1,1] + f[0,1,-1] + f[0,-1,1] + f[0,-1,-1] +
+		f[1,1] + f[1,0,1] + f[1,-1] + f[1,0,-1]) +
+	    f[1,-1,1] + f[-1,1,1] + f[-1,1,-1] + f[1,1,1] +
+	    f[1,1,-1] + f[-1,-1,-1] + f[1,-1,-1] + f[-1,-1,1])/64.;
+#endif
+#endif 
+
+#if TREE
+  sf.prolongation = refine_bilinear;
+  boundary ({sf});
+#endif
+  
+  foreach_face() {
+    double ff = (sf[] + sf[-1])/2.;
+    alphav.x[] = fm.x[]/rho(ff);
+    if (mu1 || mu2) {
+      face vector muv = mu;
+      muv.x[] = fm.x[]*mu(ff);
+    }
+  }
+  foreach()
+    rhov[] = cm[]*rho(sf[]);
+
+#if TREE  
+  sf.prolongation = fraction_refine;
+  boundary ({sf});
+#endif
+  /* fprintf (stderr, "Before calling distance \n"); */
+  /* distance_to_surface (c=f, d=dist); */
+  /* fprintf (stderr, "After calling distance \n"); */
+  /* /\* foreach()  *\/ */
+  /* /\*   fair[] = 1. - f[]; *\/ */
+  /* /\* heights (fair,h); *\/ */
+  foreach() {
+    if (y > REGION*L0)
+      Evis[] = 0.41*Ustar*y;
+    else
+      Evis[] = 0;
+  }
+  /* // eddyviscosity(Csmag,u,molvis,Evis); */
+  boundary({Evis});
+  /* foreach_face() { */
+  /*   double ff = (sf[] + sf[-1])/2.; */
+  /*   alphav.x[] = fm.x[]/rho(ff); */
+  /*   if (mu1 || mu2) { */
+  /*     face vector muv = mu; */
+  /*     muv.x[] = fm.x[]*mu(ff); */
+  /*   } */
+  /* } */
+  face vector mue = mu;
+  foreach_face(){
+    mue.x[] += (Evis[]+Evis[-1])/2;
+    // Kh.x[]=(Pr.x[]*(Km.x[]-molvis))+molvis;
+  }
+  /** In 3D, there are 4 finer faces per coarser face. So consistency with $K_m,K_h\propto \Delta^2$ is conviniently achieved by applying the *Boundary_flux* function for these face fields */
+  boundary_flux({mue});
+#if DEBUG
+  if (i == 5) {
+    char message[100];
+    sprintf (message, "after-%d", pid());
+    FILE * fp = fopen (message, "w");
+    foreach () {
+      if (y > REGION*L0)
+	fprintf (fp, "y = %g, x = %g, pid = %d, mu = %g, mue = %g\n", y, x, pid(), (mu.y[0,0]+mu.y[0,1])/2, (mue.y[0,0]+mue.y[0,0])/2);
+    }
+    fclose (fp);
+  }
+#endif
+  //boundary_flux({Km,Kh});
+}
+
 
 
 /**

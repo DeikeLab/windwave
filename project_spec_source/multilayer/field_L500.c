@@ -1,13 +1,14 @@
-
 /**
    # Field scale wave breaking (multilayer solver)
 
 */
 
 #include "grid/multigrid.h"
-#include "layered/hydro.h"
+#include "view.h"
+#include "layered/hydro_test.h"
 #include "layered/nh.h"
-#include "layered/remap.h"
+//#include "layered/remap.h"
+#include "remap_test.h"
 #include "layered/perfs.h"
 #include "input.h"
 #include "output_mpi.h"
@@ -16,93 +17,219 @@
    The initial condition is a externally imported wave field. Some controlling parameters. */
 
 #define g_ 9.8
-double ETAE = 0.1; // refinement criteria for eta
-int MAXLEVEL = 8; // max level of refinement in adapt_wavelet function
-int MINLEVEL = 6; // min level
+#define h_ 100
+double gpe_base = 0;
+/* double ETAE = 0.1; // refinement criteria for eta */
+/* int MAXLEVEL = 8; // max level of refinement in adapt_wavelet function */
+/* int MINLEVEL = 6; // min level */
 double TEND = 50.; // t end
 int NLAYER = 10; // number of layers
 int LEVEL_data = 7;
 
-int read_xy_float(char * fname, scalar s, int dlev){
-  unsigned long long int size = (1 << (dimension*dlev));
+double kp_ = 2.*pi/100.;
+double P_ = 0.01;
+int N_power_ = 5;
+#define N_mode_ 16
+double F_kxky_[N_mode_*(N_mode_+1)], omega[N_mode_*(N_mode_+1)], phase[N_mode_*(N_mode_+1)];
+double kx_[N_mode_], ky_[N_mode_+1];
+double dkx_, dky_;
+
+double randInRange(int min, int max)
+{
+  return min + (rand() / (double) (RAND_MAX) * (max - min + 1));
+}
+
+void power_input() {
+  for (int i=0; i<N_mode_; i++) {
+    kx_[i] = 2.*pi/L0*(i+1);
+    ky_[i] = 2.*pi/L0*(i-N_mode_/2);
+  }
+  ky_[N_mode_] = 2.*pi/L0*N_mode_/2;
+  dkx_ = kx_[1]-kx_[0];
+  dky_ = ky_[1]-ky_[0];
+  // A function that reads in F_kxky_. Next step is to generate F_kxky_ all inside
 #if _MPI 
-  MPI_Win win;
-  float * a;
-  if (pid() == 0){
-    MPI_Win_allocate_shared (size*sizeof(float), sizeof(float), MPI_INFO_NULL, MPI_COMM_WORLD, &a, &win);
+  /* MPI_Win win; */
+  /* float * a; */
+  /* if (pid() == 0){ */
+  /*   MPI_Win_allocate_shared (size*sizeof(float), sizeof(float), MPI_INFO_NULL, MPI_COMM_WORLD, &a, &win); */
+  /* } */
+  /* else{ // Slaves obtain the location of the pid()=0 allocated array     */
+  /*   int disp_unit; */
+  /*   MPI_Aint  ssize;  */
+  /*   MPI_Win_allocate_shared (0, sizeof(float), MPI_INFO_NULL,MPI_COMM_WORLD, &a, &win); */
+  /*   MPI_Win_shared_query (win, 0, &ssize, &disp_unit, &a); */
+  /* } */
+  /* MPI_Barrier (MPI_COMM_WORLD); */
+  /* if (pid() == 0){  */
+  /*   MPI_Win_lock (MPI_LOCK_EXCLUSIVE, 0, MPI_MODE_NOCHECK, win); */
+  /*   FILE * fp = fopen (fname, "rb"); */
+  /*   fread (a, sizeof(float), size,fp); */
+  /*   MPI_Win_unlock (0, win); */
+  /* } */
+  /* MPI_Barrier (MPI_COMM_WORLD); */
+
+  /* MPI_File fh; */
+  /* char filename[100]; */
+  /* sprintf (filename, "F_kxky"); */
+  /* MPI_File_open(MPI_COMM_SELF, filename, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh); */
+  /* int size = N_mode_*N_mode_; */
+  /* float * a = (float*) malloc (sizeof(float)*size); */
+  /* MPI_FILE_read(&fh, a, size, MPI_FLOAT);  */
+  /* MPI_File_close(&fh); */
+
+  int length = N_mode_*N_mode_;
+  char message[20];
+  int  i, rank, size;
+  MPI_Status status;
+  int root = 0;
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if (rank == root) {
+    int length = N_mode_*N_mode_;
+    float * a = (float*) malloc (sizeof(float)*length);
+    char filename[100];
+    sprintf (filename, "F_kxky");
+    FILE * fp = fopen (filename, "rb");
+    fread (a, sizeof(float), length, fp);
+    for (int i=0;i<length;i++) {
+      F_kxky_[i] = (double)a[i];
+      //fprintf(stderr, "%g \n", F_kxky_[i]);
+    }
+    fclose (fp);
+    // Phase and omega, next focusing phase
+    double kmod = 0;
+    int index = 0;
+    srand(0); // We can seed it differently for different runs
+    for (int i=0; i<N_mode_;i++) {
+      for (int j=0;j<N_mode_;j++) {
+	index = j*N_mode_ + i;
+	kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
+	omega[index] = sqrt(g_*kmod);
+	phase[index] = randInRange (0, 2.*pi);
+      }
+    }
   }
-  else{ // Slaves obtain the location of the pid()=0 allocated array    
-    int disp_unit;
-    MPI_Aint  ssize; 
-    MPI_Win_allocate_shared (0, sizeof(float), MPI_INFO_NULL,MPI_COMM_WORLD, &a, &win);
-    MPI_Win_shared_query (win, 0, &ssize, &disp_unit, &a);
+  MPI_Bcast(&F_kxky_, length, MPI_DOUBLE, root, MPI_COMM_WORLD);
+  MPI_Bcast(&omega, length, MPI_DOUBLE, root, MPI_COMM_WORLD);
+  MPI_Bcast(&phase, length, MPI_DOUBLE, root, MPI_COMM_WORLD);
+  //printf( "Message from process %d : %s\n", rank, message);
+  char checkout[100];
+  sprintf (checkout, "F-%d", pid());
+  FILE * fout = fopen (checkout, "w");
+  for (int i=0; i<length; i++)
+    fprintf (fout, "%g ", F_kxky_[i]);
+  fclose (fout);
+  sprintf (checkout, "phase-%d", pid());
+  fout = fopen (checkout, "w");
+  for (int i=0; i<length; i++)
+    fprintf (fout, "%g ", phase[i]);
+  fclose (fout);
+#else
+  int length = N_mode_*N_mode_;
+  float * a = (float*) malloc (sizeof(float)*length);
+  char filename[100];
+  sprintf (filename, "F_kxky");
+  FILE * fp = fopen (filename, "rb");
+  fread (a, sizeof(float), length, fp);
+  for (int i=0;i<length;i++) {
+    F_kxky_[i] = (double)a[i];
+    //fprintf(stderr, "%g \n", F_kxky_[i]);
   }
-  MPI_Barrier (MPI_COMM_WORLD);
-  if (pid() == 0){ 
-    MPI_Win_lock (MPI_LOCK_EXCLUSIVE, 0, MPI_MODE_NOCHECK, win);
-    FILE * fp = fopen (fname, "rb");
-    fread (a, sizeof(float), size,fp);
-    MPI_Win_unlock (0, win);
+  fclose (fp);
+  char checkout[100];
+  sprintf (checkout, "F");
+  FILE * fout = fopen (checkout, "w");
+  for (int i=0; i<length; i++)
+    fprintf (fout, "%g ", F_kxky_[i]);
+  fclose (fout);
+  // Phase and omega, next focusing phase
+  double kmod = 0;
+  int index = 0;
+  srand(0); 
+  for (int i=0; i<N_mode_;i++) {
+    for (int j=0;j<N_mode_;j++) {
+      index = j*N_mode_ + i;
+      kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
+      omega[index] = sqrt(g_*kmod);
+      phase[index] = randInRange (0, 2.*pi);
+    }
   }
-  MPI_Barrier (MPI_COMM_WORLD);
-	
-  /**
-     In serial, life is a bit easier.
-  */
-#else 
-  float * a = (float*) malloc (sizeof(float)*size);
-  FILE * fp = fopen (fname, "rb");
-  fread (a, sizeof(float), size, fp);
 #endif
-#if MULTIGRID_MPI  
-  int ny = pid() % (mpi_dims[1]);
-  int nx = pid() / (mpi_dims[1]);
-  int nxoffset = ((1 << depth())*nx);
-  int nyoffset = ((1 << depth())*ny);
-  fprintf (stderr, "pid = %d, mpi_dims[1] = %d, mpi_dim[0] = %d, nx = %d, ny = %d \n", pid(), mpi_dims[1], mpi_dims[0], nx, ny);
-  fflush (stderr);
-#else // Non MG-MPI, no offset 
-  int nxoffset = 0;
-  int nyoffset = 0;
-#endif
-  unsigned long long int CR = (1 << dlev);
-  // o is found to be -3 which is causing the trouble in Antoon's code
-  // int o = -BGHOSTS - 1; 
-  int o = -BGHOSTS-1;
-  /* fprintf(stderr, "o = %d\n", o); */
-  unsigned long long int index;
-  /** Loading the data itself is now straightforward*/
-  // int iternumber = 0;
-  foreach(){
-    index = ((nxoffset + point.i + o) + (CR*(nyoffset + point.j + o)));
-    /* fprintf(ferr, "point.i = %d, point.j = %d, index = %d\n", point.i, point.j, index); */
-    s[] = (double)a[index];
-    // iternumber += 1;
-  }
-  // fprintf(ferr, "iteration number = %d", iternumber);  
-  return 1;
 }
 
-/**
-   The adaptive function. */
-int my_adapt() {
-#if QUADTREE
-  /* scalar eta[]; */
-  /* foreach() */
-  /*   eta[] = h[] > dry ? h[] + zb[] : 0; */
-  /* boundary ({eta}); */
-  astats s = adapt_wavelet ({eta}, (double[]){ETAE},
-			    MAXLEVEL, MINLEVEL);
-  fprintf (ferr, "# refined %d cells, coarsened %d cells\n", s.nf, s.nc);
-  return s.nf;
-#else // Cartesian
-  return 0;
-#endif
+double wave (double x, double y)
+{
+  double eta = 0;
+  double ampl = 0, a = 0;
+  int index = 0;
+  for (int i=0; i<N_mode_;i++) {
+    for (int j=0;j<N_mode_;j++) {
+      index = j*N_mode_ + i;
+      ampl = sqrt(2.*F_kxky_[index]*dkx_*dky_);
+      a = (kx_[i]*x + ky_[j]*y + phase[index]);
+      eta += ampl*cos(a);
+    }
+  }
+  return eta;
+}
+double u_x (double x, double y, double z) {
+  int index = 0;
+  double u_x = 0;
+  double ampl = 0, a = 0;
+  double z_actual = 0, kmod = 0, theta = 0;
+  for (int i=0; i<N_mode_;i++) {
+    for (int j=0;j<N_mode_;j++) {
+      index = j*N_mode_ + i;
+      ampl = sqrt(2.*F_kxky_[index]*dkx_*dky_);
+      z_actual = (z < ampl ? (z) : ampl);
+      //fprintf(stderr, "z = %g, ampl = %g, z_actual = %g\n", z, ampl, z_actual);
+      kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
+      theta = atan(ky_[j]/kx_[i]);
+      a = (kx_[i]*x + ky_[j]*y + phase[index]);
+      u_x += sqrt(g_*kmod)*ampl*exp(kmod*z_actual)*cos(a)*cos(theta);
+    }
+  }
+  return u_x;
+}
+// #if dimension = 2
+double u_y (double x, double y, double z) {
+  int index = 0;
+  double u_y = 0;
+  double ampl = 0, a = 0;
+  double z_actual = 0, kmod = 0, theta = 0;
+  for (int i=0; i<N_mode_;i++) {
+    for (int j=0;j<N_mode_;j++) {
+      index = j*N_mode_ + i;
+      ampl = sqrt(2.*F_kxky_[index]*dkx_*dky_);
+      z_actual = (z < ampl ? (z) : ampl);
+      kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
+      theta = atan(ky_[j]/kx_[i]);
+      a = (kx_[i]*x + ky_[j]*y + phase[index]);
+      u_y += sqrt(g_*kmod)*ampl*exp(kmod*z_actual)*cos(a)*sin(theta);
+    }
+  }
+  return u_y;
+}
+// #endif
+double u_z (double x, double y, double z) {
+  int index = 0;
+  double u_z = 0;
+  double ampl = 0, a = 0;
+  double z_actual = 0, kmod = 0;
+  for (int i=0; i<N_mode_;i++) {
+    for (int j=0;j<N_mode_;j++) {
+      index = j*N_mode_ + i;
+      ampl = sqrt(2.*F_kxky_[index]*dkx_*dky_);
+      z_actual = (z < ampl ? (z) : ampl);
+      kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
+      a = (kx_[i]*x + ky_[j]*y + phase[index]);
+      u_z += sqrt(g_*kmod)*ampl*exp(kmod*z_actual)*sin(a);
+    }
+  }
+  return u_z;
 }
 
-/**
-   The domain is periodic in $x$ and resolved using 256$^2$
-   points and 60 layers. */
 
 int main(int argc, char * argv[])
 {
@@ -111,15 +238,11 @@ int main(int argc, char * argv[])
   if (argc > 2)
     LEVEL_data = atoi(argv[2]);
   if (argc > 3)
-    MAXLEVEL = atoi(argv[3]);
+    TEND = atof(argv[3]);
   if (argc > 4)
-    MINLEVEL = atoi(argv[4]);
-  if (argc > 5)
-    ETAE = atof(argv[5]);
-  if (argc > 6)
-    TEND = atof(argv[6]);
-  if (argc > 7)
-    breaking = atof(argv[7]);
+    nu = atof(argv[4]);
+  else
+    nu = 0.;
   L0 = 500.;
   origin (-L0/2., -L0/2.);
   periodic (right);
@@ -127,61 +250,52 @@ int main(int argc, char * argv[])
   N = 1 << LEVEL_data; // start with a grid of 128
   nl = NLAYER;
   G = g_;
-  nu = 1/40000.;
-  CFL_H = 0.1; // Smaller time step
+  coeff = 0.1;
+#if dimension == 2
+  gpe_base = -0.5*sq(h_)*sq(L0)*g_;
+#else
+  gpe_base = -0.5*sq(h_)*L0*g_;
+#endif
+  CFL_H = 1; // Smaller time step
+  // max_slope = 0.8;
   run();
 }
-
-/**
-   The intial conditions for the free-surface and velocity are given by
-   the input field. */
-
 
 event init (i = 0)
 {
   if (!restore ("restart")) {
-    /** Import surface position. h of each layer is (H-zb)/nl. */
-    /* FILE * feta = fopen ("./pre/eta", "r"); */
-    // H is not defined previously
-    read_xy_float ("pre/eta", eta, LEVEL_data);
-    /* fclose (feta); */
-    fprintf(stderr, "Read in eta!\n");
+    power_input();
     foreach() {
-      zb[] = -5.; // zb[] is a scalar field already defined in header file
-      foreach_layer() { 
-	h[] = (eta[]-zb[])/nl;
+      zb[] = -h_;
+      eta[] = wave(x, y);
+      double H = wave(x, y) - zb[];
+      foreach_layer() {
+	h[] = H/nl;
       }
     }
-    /** Import velocity. */
-    char filename_u[50], filename_v[50], filename_w[50];
-    for (int ii=0; ii<nl; ii++) {
-      sprintf (filename_u, "pre/u_layer%d", ii);
-      sprintf (filename_v, "pre/v_layer%d", ii);
-      sprintf (filename_w, "pre/w_layer%d", ii);
-      char s[100];
-      sprintf (s, "u%d", ii+1);
-      vector u_temp = lookup_vector (s);
-      read_xy_float (filename_u, u_temp.x, LEVEL_data);
-      read_xy_float (filename_v, u_temp.y, LEVEL_data);
-      sprintf (s, "w%d", ii+1);
-      scalar w_temp = lookup_field (s);
-      read_xy_float (filename_w, w_temp, LEVEL_data);
-      fprintf(stderr, "Read in velocity, layer index = %d!\n", ii);
-    }
+    // remap?
+    vertical_remapping (h, tracers);
     foreach() {
-      foreach_layer () 
-	zb[] = -5.;
+      double z = zb[];
+      foreach_layer() {
+	z += h[]/2.;
+	u.x[] = u_x(x, y, z);
+	u.y[] = u_y(x, y, z);
+	w[] = u_z(x, y, z);
+	z += h[]/2.;
+      }
     }
+    fprintf (stderr,"Done initialization!\n");
     dump("initial");
   }
 }
 
-/** 
-    We log the evolution of kinetic and potential energy.
-*/
-
-event logfile (i++)
+event energy_before_remap (i++, last)
 {
+  if (i==10) {
+    fprintf(stderr, "energy output before remap!\n");
+    fflush(stderr);
+  }
   double ke = 0., gpe = 0.;
   foreach (reduction(+:ke) reduction(+:gpe)) {
     double zc = zb[];
@@ -194,72 +308,76 @@ event logfile (i++)
       zc += h[];
     }
   }
-  static FILE * fp = fopen("energy.dat","a");
-  fprintf (fp, "%g %g %g\n", t, ke/2., g_*gpe);
+  static FILE * fp = fopen("energy_before_remap.dat","w");
+  fprintf (fp, "%g %g %g\n", t, ke/2., g_*gpe - gpe_base);
+  fflush (fp);
+}
+
+event energy_after_remap (i++, last)
+{
+  if (i==10) {
+    fprintf(stderr, "energy output after remap!\n");
+    fflush(stderr);
+  }
+  double ke = 0., gpe = 0.;
+  foreach (reduction(+:ke) reduction(+:gpe)) {
+    double zc = zb[];
+    foreach_layer () {
+      double norm2 = sq(w[]);
+      foreach_dimension()
+	norm2 += sq(u.x[]);
+      ke += norm2*h[]*dv();
+      gpe += (zc + h[]/2.)*h[]*dv();
+      zc += h[];
+    }
+  }
+  static FILE * fp = fopen("energy_after_remap.dat","w");
+  fprintf (fp, "%g %g %g\n", t, ke/2., g_*gpe - gpe_base);
   fflush (fp);
 }
 
 /**
    Note that the movie generation below is very expensive. */
-
-int first_frame = 0;
+#  define POPEN(name, mode) fopen (name ".ppm", mode)
 #if 1
 event movie (t += 0.1; t <= TEND)
 {
-  static FILE * fp = popen ("gnuplot", "w");
-  if (first_frame == 0) 
-    fprintf (fp, "set term pngcairo font ',9' size 1024,768;"
-	     "unset key\n"
-	     "set pm3d interpolate 4,4 lighting specular 0.6\n"
-	     "set zrange [-50:50]\n"
-	     "set cbrange [-6:6]\n"
-	     "set xlabel 'x'\n"
-	     "set ylabel 'y'\n"
-	     );
-  fprintf (fp,
-	   "set output 'plot%05d.png'\n"
-	   "set title 't = %.2f'\n"
-	   "splot '-' u 1:2:3:4 w pm3d\n",
-	   i, t);
-  char s[10];
-  sprintf (s, "u%d", nl-1);
-  vector u_temp = lookup_vector (s);
-  output_field ({eta,u_temp.x}, fp, linear = true);
-  fprintf (fp, "e\n\n");
-  fflush (fp);
-  char filename1[50], filename2[50], filename3[50];
+  char s[80];
+  view (fov = 20, quat = {0.475152,0.161235,0.235565,0.832313}, width = 800, height = 600);
+  sprintf (s, "t = %.2f", t);
+  draw_string (s, size = 30);
+  sprintf (s, "u%d.x", nl-1);
+  squares (s, linear = true, z = "eta", min = -2, max = 2);
+  {
+  static FILE * fp = POPEN ("ux", "a");
+  save (fp = fp);
+  }
+  scalar slope[];
+  foreach () {
+    slope[] = (eta[1]-eta[-1])/(2.*Delta);
+  }
+  clear();
+  squares ("slope", linear = true, z = "eta", min = -1, max = 1);
+  sprintf (s, "t = %.2f", t);
+  draw_string (s, size = 30);
+  {
+  static FILE * fp = POPEN ("slope", "a");
+  save (fp = fp);
+  }
+  char filename1[50], filename2[50];
   sprintf (filename1, "surface/eta_matrix_%g", t);
   sprintf (filename2, "surface/ux_matrix_%g", t);
-  sprintf (filename3, "surface/uy_matrix_%g", t);
   FILE * feta = fopen (filename1, "w");
   // Might need to change to mpi function later
   output_matrix_mpi (eta, feta, N, linear = true);
   fclose (feta);
+  sprintf (s, "u%d", nl-1);
+  vector u_temp = lookup_vector (s);
   FILE * fux = fopen (filename2, "w");
   output_matrix_mpi (u_temp.x, fux, N, linear = true);
   fclose (fux);
-  FILE * fuy = fopen (filename3, "w");
-  output_matrix_mpi (u_temp.y, fuy, N, linear = true);
-  fclose (fuy);
 }
 
-/* event closeupmovie (t += 0.1; t <= TEND) */
-/* { */
-/*   view (fov = 17.3106, quat = {0.475152,0.161235,0.235565,0.832313}, */
-/* 	tx = -0.0221727, ty = -0.0140227, width = 1200, height = 768); */
-/*   char s[80]; */
-/*   sprintf (s, "t = %.2f T0", t/T0); */
-/*   draw_string (s, size = 80); */
-/*   for (double x = -1; x <= 1; x++) */
-/*     translate (x) */
-/*       squares ("u59.x", linear = true, z = "eta", min = -2., max = 2.); */
-/*   save ("movie.mp4"); */
-/* } */
-
-event moviemaker (t = end)
-{
-  system ("for f in plot*.png; do convert $f ppm:-; done | ppm2mp4 movie.mp4");
-}
 #endif
 
 #if QUADTREE
@@ -271,10 +389,6 @@ event adapt (i++) {
 #endif
 
 
-event dumpstep (t += 1) {
-  char dname[100];
-  sprintf (dname, "dump%g", t);
-  dump (dname);
+event endrun (t = TEND) {
+  dump();
 }
-
-

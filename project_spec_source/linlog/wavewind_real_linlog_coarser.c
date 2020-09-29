@@ -140,7 +140,7 @@ int lev;
 if( y < REGION*L0 )
    lev = LEVEL;
  else
-   lev = LEVEL-4;
+   lev = LEVEL-7;
 return lev;
 }
 

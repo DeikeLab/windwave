@@ -10,7 +10,7 @@
 EXE=wavewind_withforcing
 #Parameter value
 LEVEL=11
-ak=0.2
+ak=0.05
 BO=200
 RE=100000. #Default 40000
 UstarRATIO=0.1

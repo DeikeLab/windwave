@@ -10,10 +10,10 @@
 #include "lambda2.h"
 
 #include "adapt_wavelet_limited.h"
-
+#include "sandbox/frac-dist.h"
 bool limitedAdaptation = 1;
 
-int MAXLEVEL = dimension == 2 ? 10 :7; // max level if not use limited refinement
+int MAXLEVEL = dimension == 2 ? 10 : 5; // max level if not use limited refinement
 int MAXLEVEL1 = dimension == 2 ? 10 : 7; // max level for finer part
 int MAXLEVEL2 = dimension == 2 ? 10 : 7; // max level for coarser part
 
@@ -125,6 +125,7 @@ event init (i = 0) {
 /**
   Set the wave velocity 0. */
 event set_wave(i=0;i++) {
+  fraction (f, WaveProfile(x,z)-y);
   foreach(){
     // foreach_dimension()
     //   u.x[] = (1.0 - f[])*u.x[];
@@ -202,7 +203,7 @@ event movies (t += 1.) {
   width = 600, height = 600, bg = {1,1,1}, samples = 4);
   squares ("u.y", linear = true);
   squares ("u.x", linear = true, n = {1,0,0});
-  squares ("omega", linear = true, n = {0,1,0});
+  squares ("omega", linear = true, n = {0,1,0}, alpha = 1);
   scalar l2[];
   lambda2 (u, l2);
   isosurface ("l2", -1);
@@ -256,18 +257,19 @@ event end (t = 1000.) {
   dump ("end");
 }
 
-event dumpstep (t += 10) {
+event dumpstep (t += 1) {
   char dname[100];
   p.nodump = false;
   sprintf (dname, "dump%g", t);
   dump (dname);
 }
 
-
-/* event adapt (i++) { */
-/*   //adapt_wavelet ({f, u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, 5);  */
-/*   if(limitedAdaptation) */
-/*     adapt_wavelet_limited ({f,u}, (double[]){femax,uemax,uemax,uemax}, refRegion, 5); */
-/*   else */
-/*     adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, MAXLEVEL, 5); */
-/*  } */
+#if TREE
+event adapt (i++) {
+  //adapt_wavelet ({f, u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, 5);
+  if(limitedAdaptation)
+    adapt_wavelet_limited ({f,u}, (double[]){femax,uemax,uemax,uemax}, refRegion, 5);
+  else
+    adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, MAXLEVEL, 5);
+ }
+#endif

@@ -133,7 +133,7 @@ scalar omega[];
 scalar uwater[];
 scalar pair[], pairdiff[];
 
-
+double HRATIO = 0.25;
 double REGION = 0.2;
 int refRegion(double x,double y, double z){
 int lev;
@@ -167,13 +167,13 @@ int main (int argc, char * argv[])
     L0 = atof(argv[5]);
   if (argc > 6)
     TEND = atof(argv[6]);
-  if (argc > 7) 
+  if (argc > 7)
     REGION = atof(argv[7]);
 
   /**
      Here we set the densities and viscosities corresponding to the
      parameters above. Note that these variables are defined in two-phase.h already.*/
-  h_ = L0/2.;
+  h_ = L0*HRATIO;
   k_ = 2.*pi*(Nwave/L0);  
   rho1 = 1000.;
   rho2 = rho1*RATIO;
@@ -188,13 +188,13 @@ int main (int argc, char * argv[])
   Utop = sq(Ustar)/(mu2/rho2)*L0/2.;
   y_1 = m*mu2/rho2/Ustar;
   Udrift = B*Ustar;
-  amp_force = sq(Ustar)/(L0/2.);
+  amp_force = sq(Ustar)/(L0-h_);
 #if dimension == 2
   gpe_base = -0.5*sq(h_)*L0*g_;
 #else
   gpe_base = -0.5*sq(h_)*sq(L0)*g_;
 #endif
-  REa = rho2*Ustar*h_/mu2;
+  REa = rho2*Ustar*(L0-h_)/mu2;
   fprintf(stderr, "k = %g, BO = %g, REw = %g, REa = %g \n", k_, BO, REw, REa);
   fprintf(stderr, "a = %g \n", amp_force);
   G.y = -g_;  
@@ -202,7 +202,7 @@ int main (int argc, char * argv[])
   /**
      The domain is a cubic box centered on the origin and of length
      $L0=1$, periodic in the x- and z-directions. */
-  origin (-L0/2, -L0/2, -L0/2);
+  origin (-L0/2, -h_, -L0/2);
   periodic (right);
   u.n[top] = dirichlet(0);
   u.t[top] = neumann(0);
@@ -258,7 +258,7 @@ double eta (double x, double y) {
    using the third-order Stokes wave solution. */
 event init (i = 0)
 {
-  fprintf(stderr, "UstarRATIO=%g B=%g\n m=%g ak=%g\n", UstarRATIO, B, m, ak);
+  fprintf(stderr, "UstarRATIO=%g B=%g\n m=%g ak=%g", UstarRATIO, B, m, ak);
 
   if (!restore ("restart")) {
     do {
@@ -313,7 +313,7 @@ event init (i = 0)
 
 #if TREE  
     while (adapt_wavelet ({f, u},
-			  (double[]){femax,uemax,uemax,uemax}, LEVEL, 5).nf); //if not adapting anymore, return zero
+			  (double[]){0.01,0.05,0.05,0.05}, LEVEL, 5).nf); //if not adapting anymore, return zero
 #else
     while (0);
 #endif
@@ -495,9 +495,6 @@ event end (t = TEND*T0) {
   dump ("end");
 }
 
-event pseudo_initial (i = 10) {
-  dump ("initial");
-}
 
 /** 
     ## Dump every 1/32 period.  */

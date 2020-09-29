@@ -15,10 +15,10 @@ LEVEL=9
 TEND=60
 nu=0.000025
 #Initial field info
-FIELD=P0010
+FIELD=P0005
 
 
-export ScratchDir="/scratch/gpfs/jiarongw/multilayer/${EXE}_${FIELD}_RE40000_${LEVEL}_${NLAYER}"
+export ScratchDir="/scratch/gpfs/jiarongw/multilayer/${EXE}_${FIELD}_RE40000_${LEVEL}_${NLAYER}_rand4"
 echo $ScratchDir
 rm -rf $ScratchDir
 mkdir -p $ScratchDir

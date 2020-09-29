@@ -179,7 +179,7 @@ int main (int argc, char * argv[])
   rho2 = rho1*RATIO;
   mu1 = 8.9e-4;
   mu2 = mu1*MURATIO;
-  f.sigma = 0.074;
+  f.sigma = 0;
   BO = (rho1-rho2)*g_/sq(k_)/f.sigma; // Defined with k instead of lambda
   c_ = sqrt(g_/k_+f.sigma/rho1*k_);
   T0 = 2.*pi/sqrt(g_*k_+f.sigma/rho1*sq(k_)*k_);
@@ -195,7 +195,7 @@ int main (int argc, char * argv[])
   gpe_base = -0.5*sq(h_)*sq(L0)*g_;
 #endif
   REa = rho2*Ustar*h_/mu2;
-  fprintf(stderr, "k = %g, BO = %g, REw = %g, REa = %g \n", k_, BO, REw, REa);
+  fprintf(stderr, "k = %g, BO = inf, REw = %g, REa = %g \n", k_, REw, REa);
   fprintf(stderr, "a = %g \n", amp_force);
   G.y = -g_;  
   a = av;  
@@ -313,7 +313,7 @@ event init (i = 0)
 
 #if TREE  
     while (adapt_wavelet ({f, u},
-			  (double[]){femax,uemax,uemax,uemax}, LEVEL, 5).nf); //if not adapting anymore, return zero
+			  (double[]){0.01,0.05,0.05,0.05}, LEVEL, 5).nf); //if not adapting anymore, return zero
 #else
     while (0);
 #endif
