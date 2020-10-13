@@ -11,6 +11,8 @@
 
 #include "adapt_wavelet_limited.h"
 #include "sandbox/frac-dist.h"
+#include "sandbox/profile6.h"
+
 bool limitedAdaptation = 1;
 
 int MAXLEVEL = dimension == 2 ? 10 : 5; // max level if not use limited refinement
@@ -20,7 +22,12 @@ int MAXLEVEL2 = dimension == 2 ? 10 : 7; // max level for coarser part
 double BO = 200.;
 double RE = 100.;
 double k_ = 1;
-double g_ = 9.8;
+double g_ = 1;
+double h_ = 1;
+double ak = 0.1;
+double c_;
+double UstarRATIO = 0.5;
+double Ustar;
 
 double uemax = 0.0001;
 double femax = 0.0001;
@@ -54,8 +61,14 @@ int main(int argc, char *argv[]) {
     MAXLEVEL1 = atoi(argv[2]);
   if (argc > 3)
     MAXLEVEL2 = atoi(argv[3]);
+  if (argc > 4)
+    UstarRATIO = atof(argv[4]);
+  if (argc > 5)
+    ak = atof(argv[5]);
 
-  L0 = 2*pi ;
+  L0 = 2*pi;
+  h_ = 1;
+  k_ = 4;
   origin (-L0/2., 0, -L0/2.);
   // According to http://basilisk.fr/Basilisk%20C#boundary-conditions
   // for top, u.n = u.y, u.t = u.z, u.r = u.x
@@ -70,11 +83,12 @@ int main(int argc, char *argv[]) {
   periodic (front);
   rho1 = 1.;
   rho2 = RATIO;
-  // mu1 = 1./1.e-6*1000.;
-  mu1 = 2*pi/RE; //using wavelength as length scale
-  mu2 = mu1*MURATIO;
-  f.sigma = 1./(BO*sq(k_));
+  f.sigma = rho1/(BO*sq(k_));
   G.y = -g_;
+  c_ = sqrt(g_/k_+f.sigma/rho1*k_);
+  Ustar = c_*UstarRATIO;
+  mu1 = (2.*pi/k_)*c_*rho1/RE; //using wavelength as length scale
+  mu2 = mu1*MURATIO;
   // Give the address of av to a so that acceleration can be changed
   a = av;
   init_grid (1 << (MAXLEVEL+1));
@@ -85,9 +99,18 @@ int main(int argc, char *argv[]) {
 /** 
     Specify the interface shape. */
 double WaveProfile(double x, double z) {
-  double H = 1 + 0.1*sin(4.*x);
-  // Write a small amplitude first order wave function
-  return H;
+  /* double H = 1 + 0.1*sin(4.*x); */
+  /* // Write a small amplitude first order wave function */
+  /* return H; */
+  double a_ = ak/k_;
+  double eta1 = a_*cos(k_*x);
+  double alpa = 1./tanh(k_*h_);
+  double eta2 = 1./4.*alpa*(3.*sq(alpa) - 1.)*sq(a_)*k_*cos(2.*k_*x);
+  double eta3 = -3./8.*(cube(alpa)*alpa - 
+			3.*sq(alpa) + 3.)*cube(a_)*sq(k_)*cos(k_*x) + 
+    3./64.*(8.*cube(alpa)*cube(alpa) + 
+	    (sq(alpa) - 1.)*(sq(alpa) - 1.))*cube(a_)*sq(k_)*cos(3.*k_*x);
+  return eta1 + ak*eta2 + sq(ak)*eta3 + h_;
 }
 
 /**
@@ -101,13 +124,74 @@ double randInRange(int min, int max)
 event init (i = 0) {
   if (!restore("restart")){
     double rand = 0;
-    fraction (f, WaveProfile(x,z)-y);
-    foreach() {
-        rand = randInRange (0,0.1);
-        u.x[] = (1+rand)*(1.-f[]);  
-        u.y[] = 0.;
-        u.z[] = 0.;
+    do {
+      fraction (f, WaveProfile(x,z)-y);
+      foreach() {
+	rand = randInRange (0,0.1);
+	u.x[] = (4+rand)*(1.-f[]);  
+	u.y[] = 0.;
+	u.z[] = 0.;
       }
+      boundary ((scalar *){u});
+    }
+#if TREE  
+    while (adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, MAXLEVEL1, 5)); //if not adapting anymore, return zero
+#else
+    while (0);
+#endif
+
+  }
+  /* do { */
+  /*   fraction (f, WaveProfile(x,z)-y); */
+  /*   foreach(){ */
+  /*     u.x[] = y; */
+  /*     u.y[] = 0.; */
+  /*     u.z[] = 0.; */
+  /*   } */
+  /*   boundary ((scalar *){u}); */
+  /* } */
+  /* while (adapt_wavelet ({f,u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, MAXLEVEL-2).nf); */
+}
+
+/**
+  Set the wave velocity 0. */
+event set_wave(i=0;i++;t<50) {
+  fraction (f, WaveProfile(x,z)-y);
+  foreach(){
+    // foreach_dimension()
+    //   u.x[] = (1.0 - f[])*u.x[];
+    u.x[] = (1.0 - f[])*u.x[];
+    u.y[] = (1.0 - f[])*u.y[];
+    u.z[] = (1.0 - f[])*u.z[];
+  }
+  boundary ((scalar *){u});
+}
+
+/** 
+    Start the wave at t=50. */
+event start(t=50) {
+  // A slightly changed version of stokes wave as y=0 at the bottom now so y+h -> y
+  do{
+    scalar Phi[];
+    foreach() {
+      double alpa = 1./tanh(k_*h_);
+      double a_ = ak/k_;
+      double sgma = sqrt(g_*k_*tanh(k_*h_)*
+			 (1. + k_*k_*a_*a_*(9./8.*(sq(alpa) - 1.)*
+					    (sq(alpa) - 1.) + sq(alpa))));
+      double A_ = a_*g_/sgma;
+      double phi1 = A_*cosh(k_*(y))/cosh(k_*h_)*sin(k_*x);
+      double phi2 = 3.*ak*A_/(8.*alpa)*(sq(alpa) - 1.)*(sq(alpa) - 1.)*
+	cosh(2.0*k_*(y))*sin(2.0*k_*x)/cosh(2.0*k_*h_);
+      double phi3 = 1./64.*(sq(alpa) - 1.)*(sq(alpa) + 3.)*
+	(9.*sq(alpa) - 13.)*cosh(3.*k_*(y))/cosh(3.*k_*h_)*a_*a_*k_*k_*A_*sin(3.*k_*x);
+      Phi[] = phi1 + ak*phi2 + ak*ak*phi3;
+    } 
+    boundary ({Phi});
+    foreach(){
+      foreach_dimension()
+	u.x[] += (Phi[1] - Phi[-1])/(2.0*Delta) * f[]; // f[] is not strictly 0 or 1 I suppose
+    }
     boundary ((scalar *){u});
     /* do { */
     /*   fraction (f, WaveProfile(x,z)-y);  */
@@ -120,27 +204,20 @@ event init (i = 0) {
     /* }  */
     /* while (adapt_wavelet ({f,u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, MAXLEVEL-2).nf);  */
   }
-}
+#if TREE  
+  while (adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, MAXLEVEL1, 5)); //if not adapting anymore, return zero
+#else
+  while (0);
+#endif
 
-/**
-  Set the wave velocity 0. */
-event set_wave(i=0;i++) {
-  fraction (f, WaveProfile(x,z)-y);
-  foreach(){
-    // foreach_dimension()
-    //   u.x[] = (1.0 - f[])*u.x[];
-    u.x[] = (1.0 - f[])*u.x[];
-    u.y[] = (1.0 - f[])*u.y[];
-    u.z[] = (1.0 - f[])*u.z[];
-  }
-  boundary ((scalar *){u});
 }
 
 event acceleration (i++) {
   /**
      Forcing term equivalent to pressure gradient in x. */
+  double ampl = sq(Ustar)/(L0-h_);
   foreach_face(x)
-    av.x[] += 0.01*(1.-f[]);
+    av.x[] += ampl*(1.-f[]);
 }
 
 /** Output video and field. */
@@ -152,100 +229,73 @@ event movies (t += 1.) {
      We first do simple movies of the volume fraction, level of
      refinement fields. In 3D, these are in a $z=0$ cross-section. */
 
-  /* { */
-  /*   static FILE * fp = POPEN ("f", "w"); */
-  /*   output_ppm (f, fp, min = 0, max = 1, n = 512); */
-  /* } */
-
-/* #if TREE */
-/*   { */
-/*     scalar l[]; */
-/*     foreach() */
-/*       l[] = level; */
-/*     static FILE * fp = POPEN ("level", "w"); */
-/*     output_ppm (l, fp, min = 5, max = MAXLEVEL, n = 512); */
-/*   } */
-/* #endif */
-
   scalar omega[];
   vorticity (u, omega);
-  /* clear(); */
-  /* view (width = 1200, height = 1200); */  
-  /* squares ("u.x", linear = true, n = {0,0,1}, alpha = 0); */
-  /* { */
-  /*   static FILE * fp = POPEN ("Ux", "w"); */
-  /*   save (fp = fp); */
-  /* } */
-  /* squares ("u.y", linear = true, n = {0,0,1}, alpha = 0); */
-  /* { */
-  /*   static FILE * fp = POPEN ("Uy", "w"); */
-  /*   save (fp = fp); */
-  /* } */
-  /* squares ("u.z", linear = true, n = {1,0,0}, alpha = 0); */
-  /* { */
-  /*   static FILE * fp = POPEN ("Uz", "w"); */
-  /*   save (fp = fp); */
-  /* } */
-  /* squares ("omega", linear = true, n = {0,0,1}, alpha = 0); */
-  /* { */
-  /*   static FILE * fp = POPEN ("omega", "w"); */
-  /*   save (fp = fp); */
-  /* } */
-  /* clear(); */
-  /* squares("level"); */
-  /* cells(); */
-  /* { */
-  /*   static FILE * fp = POPEN("level", "w"); */
-  /*   save (fp = fp); */
-  /* } */
   clear();
-  view (fov = 44, camera = "iso", ty = .2,
+  view (fov = 32, camera = "iso", ty = -0.25,
   width = 600, height = 600, bg = {1,1,1}, samples = 4);
-  squares ("u.y", linear = true);
-  squares ("u.x", linear = true, n = {1,0,0});
-  squares ("omega", linear = true, n = {0,1,0}, alpha = 1);
-  scalar l2[];
-  lambda2 (u, l2);
-  isosurface ("l2", -1);
+  squares ("u.x", linear = true, n = {0,0,1});
+  squares ("omega", linear = true, n = {1,0,0});
+  cells (n = {1,0,0});
+  draw_vof ("f", color = "u.x");
+  char s[80];
+  sprintf (s, "t = %0.1f", t);
+  draw_string (s, size = 30);
+  // scalar l2[];
+  // lambda2 (u, l2);
+  // isosurface ("l2", -1);
   {
-    static FILE * fp = POPEN ("3Dvortex", "w");
+    static FILE * fp = POPEN ("3D", "a");
     save (fp = fp);
   }
 }
 
+/** 
+    Log turbulent statistics. Since there is a mean flow, Re and ke should be calculated 
+    differently from the isotropics.c */
 
 event logfile (i+=100) {
-  coord ubar;
-  foreach_dimension() {
-    stats s = statsf(u.x);
-    ubar.x = s.sum/s.volume;
-  }
-
+  /* coord ubar; */
+  /* foreach_dimension() { */
+  /*   stats s = statsf(u.x); */
+  /*   ubar.x = s.sum/s.volume; */
+  /* } */
   double ke = 0., vd = 0., vol = 0.;
   foreach(reduction(+:ke) reduction(+:vd) reduction(+:vol)) {
     vol += dv();
     foreach_dimension() {
       // mean fluctuating kinetic energy
-      ke += dv()*sq(u.x[] - ubar.x);
+      // ke += dv()*sq(u.x[] - ubar.x);
       // viscous dissipation
       vd += dv()*(sq(u.x[1] - u.x[-1]) +
                   sq(u.x[0,1] - u.x[0,-1]) +
                   sq(u.x[0,0,1] - u.x[0,0,-1]))/sq(2.*Delta);
     }
   }
-  ke /= 2.*vol;
+  // ke /= 2.*vol;
   vd *= mu1/vol;
   static FILE * fd = fopen("stats.dat","a");//"w" before
   if (i == 0) {
     fprintf (ferr, "t dissipation energy Reynolds\n");          //screen
     fprintf (fd, "t dissipation energy Reynolds\n");
   }
-  fprintf (ferr, "%g %g %g %g\n",
-           t, vd, ke, 2./3.*ke/mu1*sqrt(15.*mu1/vd));
+  /* fprintf (ferr, "%g %g %g %g\n", */
+  /*          t, vd, ke, 2./3.*ke/mu1*sqrt(15.*mu1/vd)); */
   fprintf (fd, "%g %g %g %g\n",
-           t, vd, ke, 2./3.*ke/mu1*sqrt(15.*mu1/vd));
+           t, vd, 0, 0);
   fflush(fd);
 }
+
+/** Profiling function provided by Antoon. */
+/* event profile_maker (t += 5) { */
+/*   char file[99]; */
+/*   sprintf (file, "prof%g", t); */
+/*   vertex scalar phi[]; */
+/*   distance_to_surface (f, phi = phi); */
+/*   profiles ({u.x, u.y, u.z}, phi, rf = 0.5, */
+/* 	    fname = file, min = 0.05, max = 5); */
+/* } */
+
 
 /**
    ## End 

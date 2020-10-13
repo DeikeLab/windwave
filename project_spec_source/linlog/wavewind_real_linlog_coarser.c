@@ -313,7 +313,7 @@ event init (i = 0)
 
 #if TREE  
     while (adapt_wavelet ({f, u},
-			  (double[]){femax,uemax,uemax,uemax}, LEVEL, 5).nf); //if not adapting anymore, return zero
+			  (double[]){femax*10,uemax*10,uemax*10,uemax*10}, LEVEL, 5).nf); //if not adapting anymore, return zero
 #else
     while (0);
 #endif

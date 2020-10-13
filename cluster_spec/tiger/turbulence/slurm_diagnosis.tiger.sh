@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --nodes=4
-#SBATCH --ntasks=160
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
-#SBATCH --time=08:00:00
+#SBATCH --time=00:05:00
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
 #SBATCH --mail-user=jiarongw@princeton.edu
@@ -13,18 +13,13 @@ EXE=curved_uniform_forcing_moving
 LEVEL1=8
 LEVEL2=7
 RE=20000 #Default 40000
+UstarRATIO=0.5
 #START=0
 #END=50
 
 
 export ScratchDir="/scratch/gpfs/jiarongw/turbulence/${EXE}_RE${RE}"
 echo $ScratchDir
-rm -rf $ScratchDir
-mkdir -p $ScratchDir
-cp /scratch/gpfs/jiarongw/executable/f$EXE/$EXE $ScratchDir
 cd $ScratchDir
-srun ./$EXE $RE $LEVEL1 $LEVEL2 
-
-#To move the whole directory to /tigress
-#cp -r $ScratchDir /tigress/jiarongw/
-#rm -rf $ScratchDir
+#cp ../curved_uniform_forcing_RE40000/dump46 ./restart
+python call.py 0 57
