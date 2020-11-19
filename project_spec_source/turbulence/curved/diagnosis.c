@@ -9,6 +9,7 @@
 
 #define POPEN(name, mode) fopen (name ".ppm", mode)
 double snapshot_time = 0;
+int MAXLEVEL=7;
 
 void sliceXZ(char * fname,scalar s,double yp, int maxlevel){
   FILE *fpver =fopen (fname,"w"); 
@@ -85,13 +86,17 @@ void sliceXY(char * fname,scalar s,double zp, int maxlevel){
 void output_slice ()
 {
   char filename[100];
-  int Nslice = 32;
+  int Nslice = 64;
   double zslice = -L0/2;
   double L0 = 2*pi;
   for (int i=0; i<Nslice; i++) {
-    sprintf (filename, "ux_t%g_slice%d", snapshot_time, i);
     zslice += L0/Nslice;
-    sliceXY (filename,u.x,zslice,7);
+    sprintf (filename, "ux_t%g_slice%d", snapshot_time, i);
+    sliceXY (filename,u.x,zslice,MAXLEVEL);
+    sprintf (filename, "uy_t%g_slice%d", snapshot_time, i);
+    sliceXY (filename,u.y,zslice,MAXLEVEL);
+    sprintf (filename, "f_t%g_slice%d", snapshot_time, i);
+    sliceXY (filename,f,zslice,MAXLEVEL);
   }
 }
 
@@ -156,7 +161,7 @@ void plot () {
   char s[80];
   sprintf (s, "t = %0.2f", snapshot_time);
   draw_string (s, size = 30);
-  FILE * fp = POPEN ("3D", "a");
+  FILE * fp = fopen ("3D.ppm", "w");
   save (fp = fp);
 }
 
@@ -164,6 +169,8 @@ int main (int argc, char * argv[] )
 {
   if (argc > 1)
     snapshot_time = atof(argv[1]);
+  if (argc > 2)
+    MAXLEVEL = atoi(argv[2]);
   char targetname[100];
   sprintf (targetname, "dump%g", snapshot_time);
   if (!restore (targetname)) {
@@ -172,9 +179,9 @@ int main (int argc, char * argv[] )
   }
   L0 = 2.*pi;
   restore (targetname);
-  //output_twophase ();
-  //output_slice();
-  //output();
+  output_twophase ();
+  output_slice();
+  output();
   plot();
   run ();
 }

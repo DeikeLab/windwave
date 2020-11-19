@@ -15,12 +15,14 @@
 #include "sandbox/profile6.h"
 
 bool limitedAdaptation = 1;
+double RELEASETIME = 18;
+
 
 int MAXLEVEL = dimension == 2 ? 10 : 5; // max level if not use limited refinement
 int MAXLEVEL1 = dimension == 2 ? 10 : 7; // max level for finer part
 int MAXLEVEL2 = dimension == 2 ? 10 : 7; // max level for coarser part
 
-double BO = 200.;
+double BO = 0.845;
 double RE = 100.;
 double k_ = 1;
 double g_ = 1;
@@ -40,16 +42,32 @@ double femax = 0.0001;
 /**
    Set the regional refinement criteria. */
 int refRegion(double x,double y, double z){
-int lev;
-if( y < 2 && y > 0)
-   lev = MAXLEVEL1;
+  int lev;
+  if( y < 1.2 && y > 0)
+    lev = MAXLEVEL1;
   /* else if( y > 2 && y < 2*pi) */
   /*  lev = MAXLEVEL1; */
- else if (y >= 2 && y < 4)
-   lev = MAXLEVEL2;
- else 
-   lev = MAXLEVEL2-1;
-return lev;
+  else if (y >= 1.2 && y < 4)
+    lev = MAXLEVEL2;
+  else 
+    lev = MAXLEVEL2-1;
+  return lev;
+}
+
+// We might need a diffferent refinement for waves
+int refRegion_wave(double x,double y, double z){
+  int lev;
+  if( y < 1.1 && y > 0)
+    lev = MAXLEVEL1+1;
+  /* else if( y > 2 && y < 2*pi) */
+  /*  lev = MAXLEVEL1; */
+  else if (y >= 1.1 && y < 2)
+    lev = MAXLEVEL1;
+  else if (y >= 2 && y < 4)
+    lev = MAXLEVEL2;
+  else
+    lev = MAXLEVEL2-1;
+  return lev;
 }
 
 /**
@@ -68,6 +86,8 @@ int main(int argc, char *argv[]) {
     UstarRATIO = atof(argv[4]);
   if (argc > 5)
     ak = atof(argv[5]);
+  if (argc > 6)
+    RELEASETIME = atof(argv[6]);
 
   L0 = 2*pi;
   h_ = 1;
@@ -146,7 +166,7 @@ event init (i = 0) {
     }
 #if TREE  
     // while (adapt_wavelet_limited ({f,u}, (double[]){femax,uemax*10,uemax*10,uemax*10}, refRegion, 5).nf); //if not adapting anymore, return zero
-    while (adapt_wavelet ({f,u}, (double[]){femax,uemax*100.,uemax*100.,uemax*100.}, MAXLEVEL2-1, 5).nf);
+    while (adapt_wavelet ({f,u}, (double[]){femax,uemax*1.,uemax*1.,uemax*1.}, MAXLEVEL1-1, 5).nf);
 #else
     while (0);
 #endif
@@ -166,7 +186,7 @@ event init (i = 0) {
 
 /**
   Set the wave velocity 0. */
-event set_wave(i=0;i++;t<55) {
+event set_wave(i=0; i++; t<RELEASETIME) {
   fraction (f, WaveProfile(x,z)-y);
   foreach(){
     // foreach_dimension()
@@ -180,48 +200,60 @@ event set_wave(i=0;i++;t<55) {
 
 /** 
     Start the wave at t=50. */
-event start(t=55) {
-  // A slightly changed version of stokes wave as y=0 at the bottom now so y+h -> y
-  do{
-    scalar Phi[];
-    foreach() {
-      double alpa = 1./tanh(k_*h_);
-      double a_ = ak/k_;
-      double sgma = sqrt(g_*k_*tanh(k_*h_)*
-			 (1. + k_*k_*a_*a_*(9./8.*(sq(alpa) - 1.)*
-					    (sq(alpa) - 1.) + sq(alpa))));
-      double A_ = a_*g_/sgma;
-      double phi1 = A_*cosh(k_*(y))/cosh(k_*h_)*sin(k_*x);
-      double phi2 = 3.*ak*A_/(8.*alpa)*(sq(alpa) - 1.)*(sq(alpa) - 1.)*
-	cosh(2.0*k_*(y))*sin(2.0*k_*x)/cosh(2.0*k_*h_);
-      double phi3 = 1./64.*(sq(alpa) - 1.)*(sq(alpa) + 3.)*
-	(9.*sq(alpa) - 13.)*cosh(3.*k_*(y))/cosh(3.*k_*h_)*a_*a_*k_*k_*A_*sin(3.*k_*x);
-      Phi[] = phi1 + ak*phi2 + ak*ak*phi3;
-    } 
-    boundary ({Phi});
-    foreach(){
-      foreach_dimension()
-	u.x[] += (Phi[1] - Phi[-1])/(2.0*Delta) * f[]; // f[] is not strictly 0 or 1 I suppose
-    }
-    boundary ((scalar *){u});
-    /* do { */
-    /*   fraction (f, WaveProfile(x,z)-y);  */
-    /*   foreach(){  */
-    /* 	u.x[] = y;    */
-    /*     u.y[] = 0.;  */
-    /*     u.z[] = 0.; */
-    /*   }  */
-    /*   boundary ((scalar *){u}); */
-    /* }  */
-    /* while (adapt_wavelet ({f,u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, MAXLEVEL-2).nf);  */
-  }
-#if TREE  
-  while (adapt_wavelet_limited ({f,u}, (double[]){femax,uemax,uemax,uemax}, refRegion, 5).nf); //if not adapting anymore, return zero
-  // while (adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, MAXLEVEL1, 5).nf);
-#else
-  while (0);
-#endif
+/* event start(t=55) { */
+/*   // A slightly changed version of stokes wave as y=0 at the bottom now so y+h -> y */
+/*   fraction (f, WaveProfile(x,z)-y); */
+/*   do{ */
+/*     scalar Phi[]; */
+/*     foreach() { */
+/*       double alpa = 1./tanh(k_*h_); */
+/*       double a_ = ak/k_; */
+/*       double sgma = sqrt(g_*k_*tanh(k_*h_)* */
+/* 			 (1. + k_*k_*a_*a_*(9./8.*(sq(alpa) - 1.)* */
+/* 					    (sq(alpa) - 1.) + sq(alpa)))); */
+/*       double A_ = a_*g_/sgma; */
+/*       double phi1 = A_*cosh(k_*(y))/cosh(k_*h_)*sin(k_*x); */
+/*       double phi2 = 3.*ak*A_/(8.*alpa)*(sq(alpa) - 1.)*(sq(alpa) - 1.)* */
+/* 	cosh(2.0*k_*(y))*sin(2.0*k_*x)/cosh(2.0*k_*h_); */
+/*       double phi3 = 1./64.*(sq(alpa) - 1.)*(sq(alpa) + 3.)* */
+/* 	(9.*sq(alpa) - 13.)*cosh(3.*k_*(y))/cosh(3.*k_*h_)*a_*a_*k_*k_*A_*sin(3.*k_*x); */
+/*       Phi[] = phi1 + ak*phi2 + ak*ak*phi3; */
+/*     }  */
+/*     boundary ({Phi}); */
+/*     foreach(){ */
+/*       foreach_dimension() */
+/* 	u.x[] += (Phi[1] - Phi[-1])/(2.0*Delta) * f[]; // f[] is not strictly 0 or 1 I suppose */
+/*     } */
+/*     boundary ((scalar *){u}); */
+/*     /\* do { *\/ */
+/*     /\*   fraction (f, WaveProfile(x,z)-y);  *\/ */
+/*     /\*   foreach(){  *\/ */
+/*     /\* 	u.x[] = y;    *\/ */
+/*     /\*     u.y[] = 0.;  *\/ */
+/*     /\*     u.z[] = 0.; *\/ */
+/*     /\*   }  *\/ */
+/*     /\*   boundary ((scalar *){u}); *\/ */
+/*     /\* }  *\/ */
+/*     /\* while (adapt_wavelet ({f,u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, MAXLEVEL-2).nf);  *\/ */
+/*   } */
+/* #if TREE   */
+/*   while (adapt_wavelet_limited ({f,u}, (double[]){femax,uemax,uemax,uemax}, refRegion, 5).nf); //if not adapting anymore, return zero */
+/*   // while (adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, MAXLEVEL1, 5).nf); */
+/* #else */
+/*   while (0); */
+/* #endif */
 
+/* } */
+
+#include "test/stokes.h"
+event start(t = RELEASETIME) {
+  // A slightly changed version of stokes wave as y=0 at the bottom now so y+h -> y
+  fraction (f, WaveProfile(x,z)-y);
+  foreach () {
+    u.x[] += u_x(x, y-h_)*f[];
+    u.y[] += u_y(x, y-h_)*f[];
+  }
+  boundary ((scalar *){u});
 }
 
 event acceleration (i++) {
@@ -327,11 +359,21 @@ event dumpstep (t += 0.1) {
 }
 
 #if TREE
-event adapt (i++;i>5) {
+event adapt (i++) {
   //adapt_wavelet ({f, u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, 5);
-  if(limitedAdaptation)
-    adapt_wavelet_limited ({f,u}, (double[]){femax,uemax,uemax,uemax}, refRegion, 5);
+  if(limitedAdaptation) {
+    if (i > 5)
+      adapt_wavelet_limited ({f,u}, (double[]){femax,uemax,uemax,uemax}, refRegion, 5);
+  }
   else
-    adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, MAXLEVEL, 5);
+    adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, MAXLEVEL1, 5);
  }
+/* event adapt2 (i++;t>=55) { */
+/*   //adapt_wavelet ({f, u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, 5); */
+/*   if(limitedAdaptation) */
+/*     adapt_wavelet_limited ({f,u}, (double[]){femax,uemax,uemax,uemax}, refRegion_wave, 5); */
+/*   else */
+/*     adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, MAXLEVEL, 5); */
+/*  } */
 #endif
+
