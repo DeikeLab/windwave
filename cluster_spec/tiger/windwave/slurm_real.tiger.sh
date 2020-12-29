@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=40
-#SBATCH --time=04:00:00
+#SBATCH --time=02:00:00
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
 #SBATCH --mail-user=jiarongw@princeton.edu
@@ -10,10 +10,10 @@
 EXE=wavewind_real_linlog_coarser
 #Parameter value
 LEVEL=11
-ak=0.05
+ak=0.1
 UstarRATIO=0.4
-Nwave=1
-L0=0.055
+Nwave=4
+L0=0.12
 TEND=50
 REGION=0.05
 

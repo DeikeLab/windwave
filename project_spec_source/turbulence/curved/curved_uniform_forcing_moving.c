@@ -40,6 +40,8 @@ double uemaxRATIO = 0.01;
 #define MURATIO 18.31e-6/10.0e-4 //dynamic viscosity ratio, air to water
 // kinematic viscosity air = 16*water
 
+vector u_water[];
+
 /**
    Set the regional refinement criteria. */
 int refRegion(double x,double y, double z){
@@ -282,11 +284,11 @@ event movies (t += 0.1) {
   scalar omega[];
   vorticity (u, omega);
   clear();
-  view (fov = 32, camera = "iso", ty = -0.25,
+  view (fov = 40, camera = "iso", ty = -0.25,
   width = 600, height = 600, bg = {1,1,1}, samples = 4);
-  squares ("u.x", linear = true, n = {0,0,1});
-  squares ("omega", linear = true, n = {1,0,0});
-  cells (n = {1,0,0});
+  squares ("u.x", linear = true, n = {0,0,1}, alpha = -3.1415);
+  squares ("omega", linear = true, n = {1,0,0}, alpha = -3.1415);
+  cells (n = {1,0,0}, alpha = -3.1415);
   draw_vof ("f", color = "u.x");
   char s[80];
   sprintf (s, "t = %0.1f", t);
@@ -374,8 +376,16 @@ event adapt (i++) {
   /* else */
   if (i == 5)
     fprintf(stderr, "uemaxRATIO = %g\n", uemaxRATIO);
-  adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, MAXLEVEL1);
- }
+  if (t < RELEASETIME)
+    adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, MAXLEVEL1);
+  if (t >= RELEASETIME) {
+    foreach () {
+      foreach_dimension ()
+	u_water.x[] = u.x[]*f[];
+    }
+    adapt_wavelet ({f,u,u_water}, (double[]){femax,uemax,uemax,uemax,0.001,0.001,0.001}, MAXLEVEL1);
+  }
+}
 /* event adapt2 (i++;t>=55) { */
 /*   //adapt_wavelet ({f, u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, 5); */
 /*   if(limitedAdaptation) */

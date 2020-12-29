@@ -11,16 +11,16 @@ EXE=wavewind_real_linlog_coarser
 #Parameter value
 LEVEL=11
 ak=0.05
-UstarRATIO=0.6
+UstarRATIO=0.4
 Nwave=1
-L0=0.055
+L0=0.03
 TEND=50
 REGION=0.05
 
 export ScratchDir="/scratch/gpfs/jiarongw/windwave/${EXE}_waves${Nwave}L0${L0}Ustar${UstarRATIO}ak${ak}Bo${BO}Re${RE}LEVEL${LEVEL}REGION${REGION}_comparetolinear"
 echo $ScratchDir
 cd $ScratchDir
-cp ./dump0.4 ./restart
+cp ./dump0.3 ./restart
 srun ./$EXE $LEVEL $ak $UstarRATIO $Nwave $L0 $TEND $REGION > message 2>&1
 
 #To move the whole directory to /tigress
