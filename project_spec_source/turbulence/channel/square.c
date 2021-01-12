@@ -1,6 +1,8 @@
 #include "grid/octree.h"
 #include "navier-stokes/centered.h"
 #include "view.h"
+#include "./sandbox/profile6.h"
+#include "navier-stokes/perfs.h"
 
 face vector muv[];
 face vector av[];
@@ -73,8 +75,25 @@ event acceleration (i++) {
     av.x[] += ampl;
 }
 
+event profile_output (t += 0.1) {
+  char file[99];
+  sprintf (file, "prof_%g", t);
+  scalar uxuy[],uxux[],uyuy[],uzuz[];
+  foreach () {
+    uxuy[] = u.x[]*u.y[];
+    uxux[] = u.x[]*u.x[];
+    uyuy[] = u.y[]*u.y[];
+    uzuz[] = u.z[]*u.z[];
+  }
+  vertex scalar phi[];
+  foreach_vertex ()
+    phi[] = y;
+  // default phi is y
+  profiles ({u.x, u.y, u.z, uxuy, uxux, uyuy, uzuz}, phi, rf = 0.5,  fname = file, min = -1., max = 1.);
+}
+
 #  define POPEN(name, mode) fopen (name ".ppm", mode)
-event movies (t += 1) {
+event movies (t += 0.1) {
 
   /**
      Movie generation. */
@@ -84,8 +103,8 @@ event movies (t += 1) {
   clear();
   view (fov = 40, camera = "iso", 
   width = 600, height = 600, bg = {1,1,1}, samples = 4);
-  squares ("u.x", linear = true, n = {0,0,1}, alpha = -0.9, max = 4, min = -4);
-  squares ("u.x", linear = true, n = {0,1,0}, alpha = -0.9, max = 4, min = -4);
+  squares ("u.x", linear = true, n = {0,0,1}, alpha = -0.9);
+  squares ("u.x", linear = true, n = {0,1,0}, alpha = -0.9);
   squares ("omega", linear = true, n = {1,0,0}, alpha = -0.9);
   cells (n = {1,0,0}, alpha = -0.9);
   // draw_vof ("f", color = "u.x");
@@ -102,20 +121,17 @@ event movies (t += 1) {
 }
 
 event adapt (i++) {
-  if (i <= 20)
-    adapt_wavelet ({u}, (double[]){3e-2,3e-2,3e-2}, 9, 5); 
-  if (i > 20)
     adapt_wavelet ({u}, (double[]){3e-2,3e-2,3e-2}, 10, 5);
 }
 
-event dumpstep (t += 10.) {
+event dumpstep (t += 0.1) {
   char dname[100];
   p.nodump = false;
   sprintf (dname, "dump%g", t);
   dump (dname);
 }
 
-event end (t = 500.) {
+event end (t = 1000.) {
   fprintf (fout, "i = %d t = %g\n", i, t);
   dump ("end");
 }

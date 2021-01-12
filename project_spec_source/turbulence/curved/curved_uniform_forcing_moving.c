@@ -22,7 +22,7 @@ int MAXLEVEL = dimension == 2 ? 10 : 5; // max level if not use limited refineme
 int MAXLEVEL1 = dimension == 2 ? 10 : 7; // max level for finer part
 int MAXLEVEL2 = dimension == 2 ? 10 : 7; // max level for coarser part
 
-double BO = 0.845;
+double BO = 10;
 double RE = 100.;
 double k_ = 1;
 double g_ = 1;
@@ -41,37 +41,6 @@ double uemaxRATIO = 0.01;
 // kinematic viscosity air = 16*water
 
 vector u_water[];
-
-/**
-   Set the regional refinement criteria. */
-int refRegion(double x,double y, double z){
-  int lev;
-  if( y < 1.2 && y > 0)
-    lev = MAXLEVEL1;
-  /* else if( y > 2 && y < 2*pi) */
-  /*  lev = MAXLEVEL1; */
-  else if (y >= 1.2 && y < 4)
-    lev = MAXLEVEL2;
-  else 
-    lev = MAXLEVEL2-1;
-  return lev;
-}
-
-// We might need a diffferent refinement for waves
-int refRegion_wave(double x,double y, double z){
-  int lev;
-  if( y < 1.1 && y > 0)
-    lev = MAXLEVEL1+1;
-  /* else if( y > 2 && y < 2*pi) */
-  /*  lev = MAXLEVEL1; */
-  else if (y >= 1.1 && y < 2)
-    lev = MAXLEVEL1;
-  else if (y >= 2 && y < 4)
-    lev = MAXLEVEL2;
-  else
-    lev = MAXLEVEL2-1;
-  return lev;
-}
 
 /**
     We need to store the variable forcing term. */
@@ -117,7 +86,7 @@ int main(int argc, char *argv[]) {
   Ustar = c_*UstarRATIO;
   mu1 = (2.*pi/k_)*c_*rho1/RE; //using wavelength as length scale
   mu2 = mu1*MURATIO;
-  fprintf (ferr, "c = %g, Ustar = %g, nu_w = %g, nu_a = %g\n", c_, Ustar, mu1/rho1, mu2/rho2);
+  fprintf (ferr, "g = %g, c = %g, Ustar = %g, nu_w = %g, nu_a = %g, sigma = %g, Bo = %g, RE = %g, Re_tau = %g", g_, c_, Ustar, mu1/rho1, mu2/rho2, f.sigma, BO, RE, Ustar*rho2/mu2*(L0-h_));
   // Give the address of av to a so that acceleration can be changed
   a = av;
   init_grid (1 << 5);
@@ -130,23 +99,13 @@ int main(int argc, char *argv[]) {
 /** 
     Specify the interface shape. */
 double WaveProfile(double x, double z) {
-  /* double H = 1 + 0.1*sin(4.*x); */
-  /* // Write a small amplitude first order wave function */
-  /* return H; */
   double a_ = ak/k_;
   double eta1 = a_*cos(k_*x);
-  double alpa = 1./tanh(k_*h_);
-  double eta2 = 1./4.*alpa*(3.*sq(alpa) - 1.)*sq(a_)*k_*cos(2.*k_*x);
-  double eta3 = -3./8.*(cube(alpa)*alpa - 
-			3.*sq(alpa) + 3.)*cube(a_)*sq(k_)*cos(k_*x) + 
-    3./64.*(8.*cube(alpa)*cube(alpa) + 
-	    (sq(alpa) - 1.)*(sq(alpa) - 1.))*cube(a_)*sq(k_)*cos(3.*k_*x);
-  return eta1 + ak*eta2 + sq(ak)*eta3 + h_;
+  return eta1 + h_;
 }
 
 /**
-A function to generate a random field initially. 
-*/
+   A function to generate a random field initially. */
 double randInRange(int min, int max)
 {
   return min + (rand() / (double) (RAND_MAX) * (max - min + 1));
@@ -165,31 +124,20 @@ event init (i = 0) {
 	  u.x[] = (1-f[])*(log((y-WaveProfile(x,z))/ytau)*Ustar/0.41+rand);
 	else
 	  u.x[] = 0.;
-	//u.x[] = (2+rand)*(1.-f[]);  
+	// Random noise gets killed by adaptation anyway. We wait for the instability to naturally develop instead.
+	// u.x[] = (2+rand)*(1.-f[]); 
 	u.y[] = 0.;
 	u.z[] = 0.;
       }
       boundary ((scalar *){u});
     }
-#if TREE  
-    // while (adapt_wavelet_limited ({f,u}, (double[]){femax,uemax*10,uemax*10,uemax*10}, refRegion, 5).nf); //if not adapting anymore, return zero
-    //while (adapt_wavelet ({f,u}, (double[]){femax,uemax*1,uemax*1,uemax*1}, MAXLEVEL1-1).nf);
+#if TREE
+    // No need for adaptation when starting 
     while (0);
 #else
     while (0);
 #endif
-
   }
-  /* do { */
-  /*   fraction (f, WaveProfile(x,z)-y); */
-  /*   foreach(){ */
-  /*     u.x[] = y; */
-  /*     u.y[] = 0.; */
-  /*     u.z[] = 0.; */
-  /*   } */
-  /*   boundary ((scalar *){u}); */
-  /* } */
-  /* while (adapt_wavelet ({f,u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, MAXLEVEL-2).nf); */
 }
 
 /**
@@ -197,8 +145,6 @@ event init (i = 0) {
 event set_wave(i=0; i++; t<RELEASETIME) {
   fraction (f, WaveProfile(x,z)-y);
   foreach(){
-    // foreach_dimension()
-    //   u.x[] = (1.0 - f[])*u.x[];
     u.x[] = (1.0 - f[])*u.x[];
     u.y[] = (1.0 - f[])*u.y[];
     u.z[] = (1.0 - f[])*u.z[];
@@ -206,56 +152,18 @@ event set_wave(i=0; i++; t<RELEASETIME) {
   boundary ((scalar *){u});
 }
 
-/** 
-    Start the wave at t=50. */
-/* event start(t=55) { */
-/*   // A slightly changed version of stokes wave as y=0 at the bottom now so y+h -> y */
-/*   fraction (f, WaveProfile(x,z)-y); */
-/*   do{ */
-/*     scalar Phi[]; */
-/*     foreach() { */
-/*       double alpa = 1./tanh(k_*h_); */
-/*       double a_ = ak/k_; */
-/*       double sgma = sqrt(g_*k_*tanh(k_*h_)* */
-/* 			 (1. + k_*k_*a_*a_*(9./8.*(sq(alpa) - 1.)* */
-/* 					    (sq(alpa) - 1.) + sq(alpa)))); */
-/*       double A_ = a_*g_/sgma; */
-/*       double phi1 = A_*cosh(k_*(y))/cosh(k_*h_)*sin(k_*x); */
-/*       double phi2 = 3.*ak*A_/(8.*alpa)*(sq(alpa) - 1.)*(sq(alpa) - 1.)* */
-/* 	cosh(2.0*k_*(y))*sin(2.0*k_*x)/cosh(2.0*k_*h_); */
-/*       double phi3 = 1./64.*(sq(alpa) - 1.)*(sq(alpa) + 3.)* */
-/* 	(9.*sq(alpa) - 13.)*cosh(3.*k_*(y))/cosh(3.*k_*h_)*a_*a_*k_*k_*A_*sin(3.*k_*x); */
-/*       Phi[] = phi1 + ak*phi2 + ak*ak*phi3; */
-/*     }  */
-/*     boundary ({Phi}); */
-/*     foreach(){ */
-/*       foreach_dimension() */
-/* 	u.x[] += (Phi[1] - Phi[-1])/(2.0*Delta) * f[]; // f[] is not strictly 0 or 1 I suppose */
-/*     } */
-/*     boundary ((scalar *){u}); */
-/*     /\* do { *\/ */
-/*     /\*   fraction (f, WaveProfile(x,z)-y);  *\/ */
-/*     /\*   foreach(){  *\/ */
-/*     /\* 	u.x[] = y;    *\/ */
-/*     /\*     u.y[] = 0.;  *\/ */
-/*     /\*     u.z[] = 0.; *\/ */
-/*     /\*   }  *\/ */
-/*     /\*   boundary ((scalar *){u}); *\/ */
-/*     /\* }  *\/ */
-/*     /\* while (adapt_wavelet ({f,u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, MAXLEVEL-2).nf);  *\/ */
-/*   } */
-/* #if TREE   */
-/*   while (adapt_wavelet_limited ({f,u}, (double[]){femax,uemax,uemax,uemax}, refRegion, 5).nf); //if not adapting anymore, return zero */
-/*   // while (adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, MAXLEVEL1, 5).nf); */
-/* #else */
-/*   while (0); */
-/* #endif */
-
-/* } */
-
-#include "test/stokes.h"
+/**
+   Start the wave at RELEASETIME. We don't do any adaptation at this step. 
+   And we use linear wave instead of stokes. */
+// #include "test/stokes.h"
+double u_x (double x, double y) {
+  return ak*c_*cos(x*k_)*exp(y*k_);
+}
+double u_y (double x, double y) {
+  return ak*c_*sin(x*k_)*exp(y*k_);
+}
 event start(t = RELEASETIME) {
-  // A slightly changed version of stokes wave as y=0 at the bottom now so y+h -> y
+  // A slightly changed version of stokes wave as y = 0 at the bottom now so y+h -> y
   fraction (f, WaveProfile(x,z)-y);
   foreach () {
     u.x[] += u_x(x, y-h_)*f[];
@@ -264,15 +172,16 @@ event start(t = RELEASETIME) {
   boundary ((scalar *){u});
 }
 
+/**
+   Forcing term equivalent to pressure gradient in x. */
 event acceleration (i++) {
-  /**
-     Forcing term equivalent to pressure gradient in x. */
   double ampl = sq(Ustar)/(L0-h_);
   foreach_face(x)
     av.x[] += ampl*(1.-f[]);
 }
 
-/** Output video and field. */
+/** 
+    Output video and field. */
 #  define POPEN(name, mode) fopen (name ".ppm", mode)
 
 event movies (t += 0.1) {
@@ -302,51 +211,24 @@ event movies (t += 0.1) {
   }
 }
 
-/** 
-    Log turbulent statistics. Since there is a mean flow, Re and ke should be calculated 
-    differently from the isotropics.c */
-
-event logfile (i+=100) {
-  /* coord ubar; */
-  /* foreach_dimension() { */
-  /*   stats s = statsf(u.x); */
-  /*   ubar.x = s.sum/s.volume; */
-  /* } */
-  double ke = 0., vd = 0., vol = 0.;
-  foreach(reduction(+:ke) reduction(+:vd) reduction(+:vol)) {
-    vol += dv();
-    foreach_dimension() {
-      // mean fluctuating kinetic energy
-      // ke += dv()*sq(u.x[] - ubar.x);
-      // viscous dissipation
-      vd += dv()*(sq(u.x[1] - u.x[-1]) +
-                  sq(u.x[0,1] - u.x[0,-1]) +
-                  sq(u.x[0,0,1] - u.x[0,0,-1]))/sq(2.*Delta);
-    }
+/**
+   Generate averaged profile in y direction o nthe fly. */
+event profile_output (t += 0.1) {
+  char file[99];
+  sprintf (file, "prof_%g", t);
+  scalar uxuy[],uxux[],uyuy[],uzuz[];
+  foreach () {
+    uxuy[] = u.x[]*u.y[];
+    uxux[] = u.x[]*u.x[];
+    uyuy[] = u.y[]*u.y[];
+    uzuz[] = u.z[]*u.z[];
   }
-  // ke /= 2.*vol;
-  vd *= mu1/vol;
-  static FILE * fd = fopen("stats.dat","a");//"w" before
-  if (i == 0) {
-    fprintf (ferr, "t dissipation energy Reynolds\n");          //screen
-    fprintf (fd, "t dissipation energy Reynolds\n");
-  }
-  /* fprintf (ferr, "%g %g %g %g\n", */
-  /*          t, vd, ke, 2./3.*ke/mu1*sqrt(15.*mu1/vd)); */
-  fprintf (fd, "%g %g %g %g\n",
-           t, vd, 0, 0);
-  fflush(fd);
+  vertex scalar phi[];
+  foreach_vertex ()
+    phi[] = y;
+  // default phi is y
+  profiles ({u.x, u.y, u.z, uxuy, uxux, uyuy, uzuz}, phi, rf = 0.5, fname = file, min = 0.8, max = 2.*pi);
 }
-
-/** Profiling function provided by Antoon. */
-/* event profile_maker (t += 5) { */
-/*   char file[99]; */
-/*   sprintf (file, "prof%g", t); */
-/*   vertex scalar phi[]; */
-/*   distance_to_surface (f, phi = phi); */
-/*   profiles ({u.x, u.y, u.z}, phi, rf = 0.5, */
-/* 	    fname = file, min = 0.05, max = 5); */
-/* } */
 
 
 /**
@@ -366,14 +248,10 @@ event dumpstep (t += 0.1) {
   dump (dname);
 }
 
+/** 
+    Adaptive function. uemax is tuned. We need a more strict criteria for water speed once the waves starts moving. */ 
 #if TREE
 event adapt (i++) {
-  //adapt_wavelet ({f, u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, 5);
-  /* if(limitedAdaptation) { */
-  /*   if (i > 5) */
-  /*     adapt_wavelet_limited ({f,u}, (double[]){femax,uemax,uemax,uemax}, refRegion, 5); */
-  /* } */
-  /* else */
   if (i == 5)
     fprintf(stderr, "uemaxRATIO = %g\n", uemaxRATIO);
   if (t < RELEASETIME)
@@ -386,12 +264,5 @@ event adapt (i++) {
     adapt_wavelet ({f,u,u_water}, (double[]){femax,uemax,uemax,uemax,0.001,0.001,0.001}, MAXLEVEL1);
   }
 }
-/* event adapt2 (i++;t>=55) { */
-/*   //adapt_wavelet ({f, u}, (double[]){femax, uemax, uemax, uemax}, MAXLEVEL, 5); */
-/*   if(limitedAdaptation) */
-/*     adapt_wavelet_limited ({f,u}, (double[]){femax,uemax,uemax,uemax}, refRegion_wave, 5); */
-/*   else */
-/*     adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, MAXLEVEL, 5); */
-/*  } */
 #endif
 
