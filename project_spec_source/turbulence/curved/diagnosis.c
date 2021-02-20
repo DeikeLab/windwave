@@ -87,28 +87,28 @@ void output_slice ()
 {
   char filename[100];
   int Nslice = 256;
-  /* double zslice = -L0/2; */
-  /* double L0 = 2*pi; */
-  /* for (int i=0; i<Nslice; i++) { */
-  /*   zslice += L0/Nslice; */
-  /*   sprintf (filename, "./field/ux_t%g_slice%d", snapshot_time, i); */
-  /*   sliceXY (filename,u.x,zslice,MAXLEVEL); */
-  /*   sprintf (filename, "./field/uy_t%g_slice%d", snapshot_time, i); */
-  /*   sliceXY (filename,u.y,zslice,MAXLEVEL); */
-  /*   sprintf (filename, "./field/f_t%g_slice%d", snapshot_time, i); */
-  /*   sliceXY (filename,f,zslice,MAXLEVEL); */
-  /* } */ 
+  double zslice = -L0/2;
   double L0 = 2*pi;
-  double yslice = pi/Nslice;
   for (int i=0; i<Nslice; i++) {
-    yslice += L0/Nslice;
+    zslice += L0/Nslice;
     sprintf (filename, "./field/ux_t%g_slice%d", snapshot_time, i);
-    sliceXZ (filename,u.x,yslice,MAXLEVEL);
+    sliceXY (filename,u.x,zslice,MAXLEVEL);
     sprintf (filename, "./field/uy_t%g_slice%d", snapshot_time, i);
-    sliceXZ (filename,u.y,yslice,MAXLEVEL);
+    sliceXY (filename,u.y,zslice,MAXLEVEL);
     sprintf (filename, "./field/f_t%g_slice%d", snapshot_time, i);
-    sliceXZ (filename,f,yslice,MAXLEVEL);
-  }  
+    sliceXY (filename,f,zslice,MAXLEVEL);
+  } 
+  /* double L0 = 2*pi; */
+  /* double yslice = pi/Nslice; */
+  /* for (int i=0; i<Nslice; i++) { */
+  /*   yslice += L0/Nslice; */
+  /*   sprintf (filename, "./field/ux_t%g_slice%d", snapshot_time, i); */
+  /*   sliceXZ (filename,u.x,yslice,MAXLEVEL); */
+  /*   sprintf (filename, "./field/uy_t%g_slice%d", snapshot_time, i); */
+  /*   sliceXZ (filename,u.y,yslice,MAXLEVEL); */
+  /*   sprintf (filename, "./field/f_t%g_slice%d", snapshot_time, i); */
+  /*   sliceXZ (filename,f,yslice,MAXLEVEL); */
+  /* }   */
 }
 
 void output ()

@@ -8,23 +8,24 @@
 #SBATCH --mail-user=jiarongw@princeton.edu
 
 #The executable name
-EXE=curved_uniform_forcing_moving
+EXE=curved_fixREtau
 #Parameter value
-LEVEL1=9
-LEVEL2=8
-RE=10000 #Default 40000
-UstarRATIO=0.5
+LEVEL=9
+RE_tau=720 #Default 40000
+BO=10
+g=0.25
 ak=0.1
-#START=0
-#END=50
+emaxRATIO=0.3
 
 
-export ScratchDir="/scratch/gpfs/jiarongw/turbulence/${EXE}_RE${RE}_Ustar${UstarRATIO}_ak${ak}_LEVEL${LEVEL1}_03_refinewater"
+export ScratchDir="/scratch/gpfs/jiarongw/turbulence/${EXE}_REtau${RE_tau}_BO${BO}_g${g}_ak${ak}_LEVEL${LEVEL}_emax${emaxRATIO}"
 echo $ScratchDir
 cd $ScratchDir
 
 # Output data on uniform grid command
-#cp $SCRATCH/executable/fdiagnosis/diagnosis ./
+mkdir ./field
+mkdir ./eta
+cp $SCRATCH/executable/fdiagnosis/diagnosis ./
 python call.py
 
 # Plotting command
