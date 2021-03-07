@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
   periodic (front);
   rho1 = 1.;
   rho2 = RATIO;
-  f.sigma = rho1/(BO*sq(k_));
+  f.sigma = g_*rho1/(BO*sq(k_));
   G.y = -g_;
   c_ = sqrt(g_/k_+f.sigma/rho1*k_);
   // Ustar = c_*UstarRATIO; // Depleted
