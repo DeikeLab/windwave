@@ -33,7 +33,7 @@ double femax = 0.0001;
 double uemaxRATIO = 0.01;
 
 #define RATIO 1.225/1000. //density ratio, air to water
-#define MURATIO 18.31e-6/10.0e-4 //dynamic viscosity ratio, air to water
+#define MURATIO 18.31e-6/5.0e-4 //dynamic viscosity ratio, air to water
 // kinematic viscosity air = 16*water
 
 vector u_water[];
@@ -230,6 +230,31 @@ event profile_output (t += 1) {
   profiles ({u.x, u.y, u.z, uxuy, uxux, uyuy, uzuz}, phi, rf = 0.5, fname = file, min = 0.8, max = 2.*pi);
 }
 
+void output_twophase (double snapshot_time) {
+  scalar pos[];
+  coord G = {0.,1.,0.}, Z = {0.,0.,0.};
+  position (f, pos, G, Z);
+  char etaname[100];
+  sprintf (etaname, "./eta/eta_t%g", snapshot_time);
+  FILE * feta = fopen (etaname, "w");
+  fprintf(feta, "x,z,pos,p,p_p1,p_p2\n");
+  // printing out quantities: p_p1 for p at plus 1, p_m1 for p at minus 1 etc.
+  foreach(){
+    if (interfacial (point, f)){
+      fprintf (feta, "%g,%g,%g,%g,%g,%g\n", 
+	       x, z, pos[], p[], p[0,1], p[0,2]);
+      /* tau.x[], tau.y[], u.x[], u.y[], n.x/norm_2, n.y/norm_2); */
+    }
+  }
+  fclose (feta);
+} 
+// TO-DO: Slice output on the fly!
+//void output_slice (double snapshot_time) {
+//}
+
+event eta_output (t > RELEASETIME; t +=0.1) {
+  output_twophase (t);
+}
 
 /**
    ## End 

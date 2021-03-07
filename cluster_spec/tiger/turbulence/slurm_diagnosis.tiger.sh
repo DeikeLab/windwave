@@ -10,8 +10,8 @@
 #The executable name
 EXE=curved_fixREtau
 #Parameter value
-LEVEL=9
-RE_tau=720 #Default 40000
+LEVEL=10
+RE_tau=1800 #Default 40000
 BO=10
 g=0.25
 ak=0.1
@@ -26,7 +26,9 @@ cd $ScratchDir
 mkdir ./field
 mkdir ./eta
 cp $SCRATCH/executable/fdiagnosis/diagnosis ./
-python call.py
+bash ./call.sh
+#module load python
+#python call.py
 
 # Plotting command
 #cp $SCRATCH/executable/fplot/plot ./ 
