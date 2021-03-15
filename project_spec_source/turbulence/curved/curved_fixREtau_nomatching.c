@@ -4,15 +4,15 @@
 #include "two-phase.h"
 #include "navier-stokes/conserving.h"
 #include "tension.h"
-#include "reduced.h"  //reduced gravity
+#include "reduced.h"  // reduced gravity
 #include "view.h"
 #include "tag.h"
 #include "lambda2.h"
 #include "navier-stokes/perfs.h"
 
 //#include "adapt_wavelet_limited.h"
-#include "sandbox/frac-dist.h"
-#include "sandbox/profile6.h"
+#include "sandbox/frac-dist.h" // extra headerfiles used in profiling function
+#include "sandbox/profile6.h"  // from Antoon
 
 double RELEASETIME = 200; 
 int MAXLEVEL = dimension == 2 ? 10 : 5; // max level if not use limited refinement
@@ -33,8 +33,10 @@ double femax = 0.0001;
 double uemaxRATIO = 0.01;
 
 #define RATIO 1.225/1000. //density ratio, air to water
-#define MURATIO 18.31e-6/5.0e-4 //dynamic viscosity ratio, air to water
+#define MURATIO 18.31e-6/10.0e-4 //dynamic viscosity ratio, air to water
 // kinematic viscosity air = 16*water
+double alter_MU = 1.; //not matching MURATIO extra factor. Default is 1, which 
+                      //means MURATIO is used.
 
 vector u_water[];
 
@@ -58,20 +60,22 @@ int main(int argc, char *argv[]) {
     RELEASETIME = atof(argv[6]);
   if (argc > 7)
     uemaxRATIO = atof(argv[7]);
-    
+  if (argc > 8)
+    alter_MU = atof(argv[8]);
+
   L0 = 2*pi;
-  h_ = 1;
-  k_ = 4;
+  h_ = 1; // Water depth
+  k_ = 4; // Four waves per box
   origin (-L0/2., 0, -L0/2.);
   // According to http://basilisk.fr/Basilisk%20C#boundary-conditions
   // for top, u.n = u.y, u.t = u.z, u.r = u.x
   u.r[top] = neumann(0);
   u.r[bottom] = neumann(0);
-  u.n[top] = dirichlet(0);
+  u.n[top] = dirichlet(0); // This is supposed to be neumann 
   u.n[bottom] = neumann(0);
   u.t[top] = neumann(0);
   u.t[bottom] = neumann(0);
-  // Test if setting to neumann change 
+  // TO-DO: Test if setting to neumann change 
   periodic (right);
   periodic (front);
   rho1 = 1.;
@@ -83,7 +87,7 @@ int main(int argc, char *argv[]) {
   Ustar = 0.25; // Pick a fixed value
   mu2 = Ustar*rho2*(L0-h_)/RE_tau;
   // mu1 = (2.*pi/k_)*c_*rho1/RE; // Depleted: using wavelength as length scale
-  mu1 = mu2/(MURATIO);
+  mu1 = mu2/(MURATIO)/alter_MU;
   RE = rho1*c_*(2*pi/k_)/mu1; // RE now becomes a dependent Non-dim number on c 
   fprintf (stderr, "g = %g, c = %g, Ustar = %g, MURATIO = %g, mu_w = %g, rho_w = %g, mu_a = %g, rho_a = %g, sigma = %g, Bo = %g, RE = %g, Re_tau = %g\n", g_, c_, Ustar, MURATIO, mu1, rho1, mu2, rho2, f.sigma, BO, RE, RE_tau);
   // Give the address of av to a so that acceleration can be changed
@@ -95,13 +99,27 @@ int main(int argc, char *argv[]) {
   run();
 }
 
-
 /** 
-    Specify the interface shape. */
-double WaveProfile(double x, double z) {
+    Specify the interface shape. Since we are considering ak=0.1/0.2/0.3, 
+    use Stokes instead of linear profile. */
+
+double WaveProfile_linear (double x, double z) {
   double a_ = ak/k_;
   double eta1 = a_*cos(k_*x);
   return eta1 + h_;
+}
+
+double WaveProfile (double x, double y)
+{
+  double a_ = ak/k_;
+  double eta1 = a_*cos(k_*x);
+  double alpa = 1./tanh(k_*h_);
+  double eta2 = 1./4.*alpa*(3.*sq(alpa) - 1.)*sq(a_)*k_*cos(2.*k_*x);
+  double eta3 = -3./8.*(cube(alpa)*alpa - 
+			3.*sq(alpa) + 3.)*cube(a_)*sq(k_)*cos(k_*x) + 
+    3./64.*(8.*cube(alpa)*cube(alpa) + 
+	    (sq(alpa) - 1.)*(sq(alpa) - 1.))*cube(a_)*sq(k_)*cos(3.*k_*x);
+  return eta1 + eta2 + eta3 + h_;
 }
 
 /**
@@ -154,22 +172,46 @@ event set_wave(i=0; i++; t<RELEASETIME) {
 
 /**
    Start the wave at RELEASETIME. We don't do any adaptation at this step. 
-   And we use linear wave instead of stokes. */
+   And we use linear wave instead of stokes. (UPDATE: use stokes for 0.1/0.2/0.3) */
 // #include "test/stokes.h"
-double u_x (double x, double y) {
+double u_x_linear (double x, double y) {
   return ak*c_*cos(x*k_)*exp(y*k_);
 }
-double u_y (double x, double y) {
+double u_y_linear (double x, double y) {
   return ak*c_*sin(x*k_)*exp(y*k_);
 }
-event start(t = RELEASETIME) {
-  // A slightly changed version of stokes wave as y = 0 at the bottom now so y+h -> y
-  fraction (f, WaveProfile(x,z)-y);
-  foreach () {
-    u.x[] += u_x(x, y-h_)*f[];
-    u.y[] += u_y(x, y-h_)*f[];
-  }
-  boundary ((scalar *){u});
+
+// TO-DO: maybe include g correction by Bond number. High Bond should be fine.
+double u_x (double x, double y)
+{
+  double alpa = 1./tanh(k_*h_);
+  double a_ = ak/k_;
+  double sgma = sqrt(g_*k_*tanh(k_*h_)*
+		     (1. + k_*k_*a_*a_*(9./8.*(sq(alpa) - 1.)*
+					(sq(alpa) - 1.) + sq(alpa))));
+  double A_ = a_*g_/sgma;
+  return A_*cosh(k_*(y + h_))/cosh(k_*h_)*k_*cos(k_*x) +
+    3.*ak*A_/(8.*alpa)*(sq(alpa) - 1.)*(sq(alpa) - 1.)*
+    cosh(2.0*k_*(y + h_))*2.*k_*cos(2.0*k_*x)/cosh(2.0*k_*h_) +
+    1./64.*(sq(alpa) - 1.)*(sq(alpa) + 3.)*
+    (9.*sq(alpa) - 13.)*
+    cosh(3.*k_*(y + h_))/cosh(3.*k_*h_)*ak*ak*A_*3.*k_*cos(3.*k_*x);
+}
+
+double u_y (double x, double y)
+{
+  double alpa = 1./tanh(k_*h_);
+  double a_ = ak/k_;
+  double sgma = sqrt(g_*k_*tanh(k_*h_)*
+		     (1. + k_*k_*a_*a_*(9./8.*(sq(alpa) - 1.)*
+					(sq(alpa) - 1.) + sq(alpa))));
+  double A_ = a_*g_/sgma;
+  return A_*k_*sinh(k_*(y + h_))/cosh(k_*h_)*sin(k_*x) +
+    3.*ak*A_/(8.*alpa)*(sq(alpa) - 1.)*(sq(alpa) - 1.)*
+    2.*k_*sinh(2.0*k_*(y + h_))*sin(2.0*k_*x)/cosh(2.0*k_*h_) +
+    1./64.*(sq(alpa) - 1.)*(sq(alpa) + 3.)*
+    (9.*sq(alpa) - 13.)*
+    3.*k_*sinh(3.*k_*(y + h_))/cosh(3.*k_*h_)*ak*ak*A_*sin(3.*k_*x);
 }
 
 /**
@@ -212,7 +254,7 @@ event movies (t += 0.1) {
 }
 
 /**
-   Generate averaged profile in y direction o nthe fly. */
+   Generate averaged profile in y direction on the fly. */
 event profile_output (t += 1) {
   char file[99];
   sprintf (file, "prof_%g", t);
@@ -230,6 +272,61 @@ event profile_output (t += 1) {
   profiles ({u.x, u.y, u.z, uxuy, uxux, uyuy, uzuz}, phi, rf = 0.5, fname = file, min = 0.8, max = 2.*pi);
 }
 
+/** 
+    Outputting slices on the fly. */
+void sliceXY(char * fname,scalar s,double zp, int maxlevel){
+  FILE *fpver =fopen (fname,"w"); 
+  int nn = (1<<maxlevel);
+  double ** field = matrix_new (nn, nn, sizeof(double));
+  double stp = L0/(double)nn;
+  for (int i = 0; i < nn; i++)
+    {
+      double xp = stp*i + X0 + stp/2.;
+      for (int j = 0; j < nn; j++) 
+	{
+	  double yp = stp*j + Y0 + stp/2.;
+	  Point point = locate (xp, yp,zp);
+	  field[i][j] = point.level >= 0 ? s[] : nodata;
+	}
+    }
+  if (pid() == 0){ // master
+#if _MPI
+    MPI_Reduce (MPI_IN_PLACE, field[0], sq(nn), MPI_DOUBLE, MPI_MIN, 0,
+		MPI_COMM_WORLD);
+#endif
+    for (int i = 0; i < nn; i++) {
+      for (int j = 0; j < nn; j++) {
+	fprintf (fpver, "%g\t", field[i][j]);
+      }
+      fputc ('\n', fpver);
+    }
+    fflush (fpver);
+  }
+#if _MPI
+  else // slave
+    MPI_Reduce (field[0], NULL, nn*nn, MPI_DOUBLE, MPI_MIN, 0,
+		MPI_COMM_WORLD);
+#endif
+  matrix_free (field);
+}
+
+event output_slice (t += 0.05)
+{
+  char filename[100];
+  double zslice = 0.;
+  int MAXLEVEL = 8;
+  sprintf (filename, "./field/ux_center_t%g", t);
+  sliceXY (filename,u.x,zslice,MAXLEVEL);
+  sprintf (filename, "./field/uy_center_t%g", t);
+  sliceXY (filename,u.y,zslice,MAXLEVEL);
+  sprintf (filename, "./field/uz_t%g_center", t);
+  sliceXY (filename,u.z,zslice,MAXLEVEL);
+  sprintf (filename, "./field/f_t%g_center", t);
+  sliceXY (filename,f,zslice,MAXLEVEL);
+}
+
+/**
+   Output eta on the fly. */
 void output_twophase (double snapshot_time) {
   scalar pos[];
   coord G = {0.,1.,0.}, Z = {0.,0.,0.};
@@ -248,18 +345,13 @@ void output_twophase (double snapshot_time) {
   }
   fclose (feta);
 } 
-// TO-DO: Slice output on the fly!
-//void output_slice (double snapshot_time) {
-//}
 
 event eta_output (t > RELEASETIME; t +=0.1) {
   output_twophase (t);
 }
 
 /**
-   ## End 
-   The wave period is `k_/sqrt(g_*k_)`. We want to run up to 2
-   (alternatively 4) periods. */
+   ## End or dump regularly. */
 
 event end (t = 1000.) {
   fprintf (fout, "i = %d t = %g\n", i, t);

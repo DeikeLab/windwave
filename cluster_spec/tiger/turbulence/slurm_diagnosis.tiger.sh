@@ -10,10 +10,10 @@
 #The executable name
 EXE=curved_fixREtau
 #Parameter value
-LEVEL=10
-RE_tau=1800 #Default 40000
-BO=10
-g=0.25
+LEVEL=9
+RE_tau=180 #Default 40000
+BO=200
+g=1
 ak=0.1
 emaxRATIO=0.3
 

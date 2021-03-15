@@ -11,25 +11,24 @@
 EXE=curved_fixREtau
 #Parameter value
 LEVEL=9
-RE_tau=1800 #Default 40000
+RE_tau=180 #Default 40000
 BO=200
 g=4
-ak=0
+ak=0.2
 TIME=200
 emaxRATIO=0.3
 
 
 export ScratchDir="/scratch/gpfs/jiarongw/turbulence/${EXE}_REtau${RE_tau}_BO${BO}_g${g}_ak${ak}_LEVEL${LEVEL}_emax${emaxRATIO}"
 echo $ScratchDir
-#rm -rf $ScratchDir
-#mkdir -p $ScratchDir
+rm -rf $ScratchDir
+mkdir -p $ScratchDir
 cp /scratch/gpfs/jiarongw/executable/f$EXE/$EXE $ScratchDir 
 cp /home/jiarongw/windwave/project_spec_source/turbulence/curved/${EXE}.c $ScratchDir
-cd $ScratchDir/fix
-#cp ../curved_uniform_forcing_moving_RE10000_Ustar0.5_ak0.1_LEVEL9_04_refinewater_precursor/dump45 ./restart
-cp ./dump10 ./restart
-mkdir ./field
+cd $ScratchDir
 mkdir ./eta
+mkdir ./field
+cp ../curved_fixREtau_precursor_REtau1800_ak0.2_LEVEL9_emax0.3/dump25 ./restart
 srun ./$EXE $RE_tau $BO $LEVEL $g $ak $TIME $emaxRATIO > message 2>&1 
 
 #To move the whole directory to /tigress

@@ -87,8 +87,8 @@ void output_slice ()
 {
   char filename[100];
   int Nslice = 256;
-  double zslice = -L0/2;
   double L0 = 2*pi;
+  double zslice = -L0/2+L0/2./Nslice;
   for (int i=0; i<Nslice; i++) {
     zslice += L0/Nslice;
     sprintf (filename, "./field/ux_t%g_slice%d", snapshot_time, i);
