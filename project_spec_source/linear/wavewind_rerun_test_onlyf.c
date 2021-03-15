@@ -1,10 +1,8 @@
-/**
-   # Breaking wave
-
-   We solve the two-phase Navier--Stokes equations with surface tension
-   and using a momentum-conserving transport of each phase. Gravity is
-   taken into account using the "reduced gravity approach" and the
-   results are visualised using Basilisk view. */
+/** 
+     This is the wave wind interaction simulation with linear wind profile and adaptive grid.
+    Pressure is output on the run by output_matrix_mpi function and also dumped into dump file.
+    For velocity initialization, velocity at the top is initialized with slope*height and kept 
+    the same across x position. */
 
 #include "navier-stokes/centered.h"
 #include "two-phase.h"
@@ -14,7 +12,60 @@
 #include "view.h"
 #include "tag.h"
 #include "navier-stokes/perfs.h"
-//#include "grid/multigrid.h"
+
+/**
+    Output pressure matrix on the run. */
+
+void output_matrix_mpi (struct OutputMatrix p)
+{
+  if (p.n == 0) p.n = N;
+  if (!p.fp) p.fp = stdout;
+  float fn = p.n, Delta = L0/fn;
+  float ** field = matrix_new (p.n, p.n, sizeof(float));
+
+  for (int i = 0; i < p.n; i++) {
+    float xp = Delta*i + X0 + Delta/2.;
+    for (int j = 0; j < p.n; j++) {
+      float yp = Delta*j + Y0 + Delta/2.;
+      if (p.linear) {
+        field[i][j] = interpolate (p.f, xp, yp);
+      }
+      else {
+        Point point = locate (xp, yp);
+        field[i][j] = point.level >= 0 ? val(p.f) : nodata;
+      }
+    }
+  }
+
+  if (pid() == 0) { // master
+@if _MPI
+    MPI_Reduce (MPI_IN_PLACE, field[0], p.n*p.n, MPI_FLOAT, MPI_MIN, 0,MPI_COMM_WORLD);
+@endif
+
+
+    fwrite (&fn, sizeof(float), 1, p.fp);
+    for (int j = 0; j < p.n; j++) {
+      float yp = Delta*j + Y0 + Delta/2.;
+      fwrite (&yp, sizeof(float), 1, p.fp);
+    }
+
+    for (int i = 0; i < p.n; i++){
+      float xp = Delta*i + X0 + Delta/2.;
+      fwrite (&xp, sizeof(float), 1, p.fp);
+      for (int j = 0; j < p.n; j++) {
+        fwrite (&field[i][j], sizeof(float), 1, p.fp);
+      }
+    }
+    fflush (p.fp);
+  }
+@if _MPI
+  else // slave
+  MPI_Reduce (field[0], NULL, p.n*p.n, MPI_FLOAT, MPI_MIN, 0,MPI_COMM_WORLD);
+@endif
+
+  matrix_free (field);
+}
+
 
 /**
    We log some profiling information. */
@@ -38,7 +89,7 @@ int LEVEL = dimension == 2 ? 10 : 6;
    The error on the components of the velocity field used for adaptive
    refinement. */
 
-double uemax = 0.001;
+double uemax = 0.01;
 double femax = 0.00001;
 
 /**
@@ -61,6 +112,7 @@ int countvelocity = 0;
 double k_ = 2.*pi;
 double h_ = 0.5;
 double g_ = 1.;
+double T0_ = 1;
 
 /** define the wind profile related parameters. */
 
@@ -68,8 +120,10 @@ double m = 5.;  // vary between 5 and 8
 double B = 0.;
 double Karman = 0.41;   // Karman universal turbulence constant
 double UstarRATIO = 1;   // Ratio between Ustar and c
-
-
+double Ustar;
+double Utop;
+double y_1 = 0.;
+double Udrift = 0.;   
 
 /**
    The program takes optional arguments which are the level of
@@ -92,20 +146,7 @@ int main (int argc, char * argv[])
   if (argc > 7)
     UstarRATIO = atof(argv[7]);
   if (argc > 8)
-    DIRAC = atof(argv[8]);
-  
-
-  /**
-     The domain is a cubic box centered on the origin and of length
-     $L0=1$, periodic in the x- and z-directions. */
-   
-  origin (-L0/2, -L0/2, -L0/2);
-  periodic (right);
-  u.n[top] = dirichlet(0);
-  //  u.t[top] = neumann(0);
-#if dimension > 2
-  periodic (front);
-#endif
+    DIRAC = atoi(argv[8]);
 
   /**
      Here we set the densities and viscosities corresponding to the
@@ -116,14 +157,30 @@ int main (int argc, char * argv[])
   mu1 = 1.0/RE; //using wavelength as length scale
   mu2 = 1.0/RE*MURATIO;
   f.sigma = 1./(BO*sq(k_));
-  G.y = -g_;
+  G.y = -g_;  
+  T0_ = 2.*pi/sqrt(g_*k_ + f.sigma*k_*k_*k_/rho1);
+  /**
+     The domain is a cubic box centered on the origin and of length
+     $L0=1$, periodic in the x- and z-directions. */
+  
+  Ustar = sqrt(g_/k_+f.sigma*k_)*UstarRATIO;
+  Utop = sq(Ustar)/(mu2/rho2)*L0/2.;
+  /* y_1 = m*mu2/rho2/Ustar; */
+  /* Udrift = B*Ustar;   */
+  origin (-L0/2, -L0/2, -L0/2);
+  periodic (right);
+  u.n[top] = dirichlet(0);
+  u.t[top] = dirichlet(Utop);
+#if dimension > 2
+  periodic (front);
+#endif
 
   /**
      When we use adaptive refinement, we start with a coarse mesh which
      will be refined as required when initialising the wave. */
   
 #if TREE  
-  N = 32; // If coarsened or not
+  N = 1024; // If coarsened or not
 #else
   N = 1 << LEVEL;
 #endif
@@ -146,7 +203,7 @@ double wave (double x, double y) {
 			3.*sq(alpa) + 3.)*cube(a_)*sq(k_)*cos(k_*x) + 
     3./64.*(8.*cube(alpa)*cube(alpa) + 
 	    (sq(alpa) - 1.)*(sq(alpa) - 1.))*cube(a_)*sq(k_)*cos(3.*k_*x);
-  return eta1 + ak*eta2 + sq(ak)*eta3 - y;
+  return eta1 + eta2 + eta3 - y;
 }
 
 double eta (double x, double y) {
@@ -158,7 +215,7 @@ double eta (double x, double y) {
 			3.*sq(alpa) + 3.)*cube(a_)*sq(k_)*cos(k_*x) + 
     3./64.*(8.*cube(alpa)*cube(alpa) + 
 	    (sq(alpa) - 1.)*(sq(alpa) - 1.))*cube(a_)*sq(k_)*cos(3.*k_*x);
-  return eta1 + ak*eta2 + sq(ak)*eta3;
+  return eta1 + eta2 + eta3;
 }
 /**
 
@@ -180,11 +237,6 @@ double gaus (double y, double yc, double T){
    using the third-order Stokes wave solution. */
 event init (i = 0)
 {
-
-  // calculate profile related info
-  double Ustar = sqrt(g_/k_+f.sigma*k_)*UstarRATIO;
-  double y1 = m*mu2/rho2/Ustar;
-  double Udrift = B*Ustar;   
   fprintf(stderr, "UstarRATIO=%g B=%g\n m=%g ak=%g", UstarRATIO, B, m, ak);
 
   if (!restore ("restart")) {
@@ -193,7 +245,7 @@ event init (i = 0)
 
       /**
 	 To initialise the velocity field, we first define the potential. */
-      
+      g_ = 1. + 1./BO;
       scalar Phi[];
       foreach() {
       	double alpa = 1./tanh(k_*h_);
@@ -207,7 +259,7 @@ event init (i = 0)
       	  cosh(2.0*k_*(y + h_))*sin(2.0*k_*x)/cosh(2.0*k_*h_);
       	double phi3 = 1./64.*(sq(alpa) - 1.)*(sq(alpa) + 3.)*
       	  (9.*sq(alpa) - 13.)*cosh(3.*k_*(y + h_))/cosh(3.*k_*h_)*a_*a_*k_*k_*A_*sin(3.*k_*x);
-      	Phi[] = phi1 + ak*phi2 + ak*ak*phi3;
+      	Phi[] = phi1 + phi2 + phi3;
       } 
       boundary ({Phi});
       if (DIRAC){
@@ -245,8 +297,10 @@ event init (i = 0)
 	  foreach_dimension()
 	    u.x[] = (Phi[1] - Phi[-1])/(2.0*Delta) * f[]; // f[] is not strictly 0 or 1 I suppose
 	}
+	/**
+	   Superimpose the air velocity on top. */
 	foreach(){
-	    u.x[] += Udrift + sq(Ustar)/(mu2/rho2)* (y-eta(x,y)) * (1-f[]);
+	  u.x[] += Udrift + Utop / (L0/2.-eta(x,y)) * (y-eta(x,y)) * (1-f[]);
 	}
         //fprintf(stderr, "Added line running for each cell!");
         //fprintf(stderr, "Added line running!");
@@ -258,13 +312,15 @@ event init (i = 0)
        On trees, we repeat this initialisation until mesh adaptation does
        not refine the mesh anymore. */
 
-#if TREE  
-    while (adapt_wavelet ({f, u},
-			  (double[]){0.01,0.05,0.05,0.05}, LEVEL, 6).nf); //if not adapting anymore, return zero
+#if TREE
+    while (0);
+    // while (adapt_wavelet ({f},
+    //			  (double[]){femax,10.*uemax,10.*uemax,10.*uemax}, LEVEL-1, 5).nf); //if not adapting anymore, return zero
 #else
     while (0);
 #endif
     //fprintf(stderr, "break3!");
+    g_ = 1.;
   }
 }
 
@@ -342,11 +398,11 @@ event graphs (i++) {
     fprintf (fpair, "t ke gpe dissipation\n");
   }
   fprintf (fpwater, "%g %g %g %g\n",
-	   t/(k_/sqrt(g_*k_)), ke/2., gpe + 0.125, dissWater);
+	   t, ke/2., gpe + 0.125, dissWater);
   fprintf (fpair, "%g %g %g %g\n",
-	   t/(k_/sqrt(g_*k_)), keAir/2., gpeAir + 0.125, dissAir);
+	   t, keAir/2., gpeAir + 0.125, dissAir);
   fprintf (ferr, "%g %g %g %g\n",
-	   t/(k_/sqrt(g_*k_)), ke/2., gpe + 0.125, dissWater);
+	   t, ke/2., gpe + 0.125, dissWater);
 }
 
 /**
@@ -365,39 +421,11 @@ event graphs (i++) {
 event movies (t += 0.1) {
 
   /**
-     We first do simple movies of the volume fraction, level of
-     refinement fields. In 3D, these are in a $z=0$ cross-section. */
+     We do simple movies of the volume fraction, level of
+     refinement fields. */
 
-  {
-    static FILE * fp = POPEN ("f", "a");
-    output_ppm (f, fp, min = 0, max = 1, n = 512);
-  }
-
-#if TREE
-  {
-    scalar l[];
-    foreach()
-      l[] = level;
-    static FILE * fp = POPEN ("level", "a");
-    output_ppm (l, fp, min = 6, max = LEVEL, n = 512);
-  }
-#endif
-
-  /**
-     <p><center>
-     <video width="512" height="512" controls>
-     <source src="wave/level.mp4" type="video/mp4">
-     Your browser does not support the video tag.
-     </video><br>
-     Wave breaking. Animation of the level of refinement.
-     </center></p>
-
-     We use Basilisk view differently in 2D and 3D. */
-  
   scalar omega[];
   vorticity (u, omega);
-
-#if dimension == 2
   view (width = 800, height = 600, fov = 18.8);
   clear();
 
@@ -407,54 +435,10 @@ event movies (t += 0.1) {
   for (double x = -L0; x <= L0; x += L0)
     translate (x) {
       draw_vof ("f");
-      squares ("omega", linear = true);
-    }
-
-  /**
-     This gives the following movie.
-     <p><center>
-     <video width="800" height="600" controls>
-     <source src="wave/movie.mp4" type="video/mp4">
-     Your browser does not support the video tag.
-     </video></center></p>
-  */
-#else // dimension == 3
-  /**
-     In 3D, we generate a first movie seen from below. */
-  
-  view (width = 1600, height = 1200, theta = pi/4, phi = -pi/6, fov = 20);
-  clear();
-  for (double x = -2*L0; x <= L0; x += L0)
-    translate (x) {
-      squares ("omega", linear = true, n = {0,0,1}, alpha = -L0/2);
-      for (double z = -3*L0; z <= L0; z += L0)
-	translate (z = z)
-	  draw_vof ("f");
+      squares ("omega", linear = true, max=50, min=-50);
     }
   {
-    static FILE * fp = POPEN ("below", "a");
-    save (fp = fp);
-  }
-
-  /**
-     And a second movie, seen from above. */
-  
-  view (width = 1600, height = 1200, theta = pi/4, phi = pi/6, fov = 20);
-  clear();
-
-  /**
-     In 3D, we are doubly-periodic (along x and z). */
-  
-  for (double x = -2*L0; x <= L0; x += L0)
-    translate (x) {
-      squares ("omega", linear = true, n = {0,0,1}, alpha = -L0/2);
-      for (double z = -3*L0; z <= L0; z += L0)
-	translate (z = z)
-	  draw_vof ("f");
-    }
-#endif 
-  {
-    static FILE * fp = POPEN ("movie", "a");
+    static FILE * fp = POPEN ("omega", "a");
     save (fp = fp);
   }
 }
@@ -465,9 +449,9 @@ event movies (t += 0.1) {
    To be able to restart, we dump the entire simulation at regular
    intervals. */
 
-event snapshot (i += 200) {
-  dump ("dump");
-}
+/* event snapshot (i += 200) { */
+/*   dump ("dump"); */
+/* } */
 
 /**
    ## End 
@@ -475,7 +459,7 @@ event snapshot (i += 200) {
    The wave period is `k_/sqrt(g_*k_)`. We want to run up to 2
    (alternatively 4) periods. */
 
-event end (t = 10.*2.*pi/sqrt(g_*k_)) {
+event end (t = 10.*T0_) {
   fprintf (fout, "i = %d t = %g\n", i, t);
   dump ("end");
 }
@@ -484,10 +468,32 @@ event end (t = 10.*2.*pi/sqrt(g_*k_)) {
 /** 
     ## Dump every 1/32 period.  */
 
-event dumpstep (t += 2.*pi/sqrt(g_*k_)/32) {
+event dumpstep (t += T0_/32.) {
   char dname[100];
-  sprintf (dname, "dump%g", t/(k_/sqrt(g_*k_)));
+  sprintf (dname, "dump%g", t/T0_);
+  p.nodump = false;
+  /* scalar p_air[],p_air_round[]; */
+  /* foreach(){ */
+  /*   p_air[] = p[]*(1-f[]); */
+  /*   if (f[]<0.5){ */
+  /*     p_air_round[] = p[]; */
+  /*   } */
+  /*   else{ */
+  /*     p_air_round[] = 0; */
+  /*   } */
+  /* } */
   dump (dname);
+  // Output pressure
+  /* char pressurename1[100], pressurename2[100], pressurename3[100]; */
+  /* sprintf (pressurename1, "./pressure/p_matrix%g.dat", t/(k_/sqrt(g_*k_))); */
+  /* sprintf (pressurename2, "./pressure/p_air_matrix%g.dat", t/(k_/sqrt(g_*k_))); */
+  /* sprintf (pressurename3, "./pressure/p_air_round_matrix%g.dat", t/(k_/sqrt(g_*k_))); */
+  /* FILE * fpressure1 = fopen (pressurename1, "w");   */
+  /* output_matrix_mpi (p, fpressure1, n = 512); */
+  /* FILE * fpressure2 = fopen (pressurename2, "w");   */
+  /* output_matrix_mpi (p_air, fpressure2, n = 512); */
+  /* FILE * fpressure3 = fopen (pressurename3, "w");   */
+  /* output_matrix_mpi (p_air_round, fpressure3, n = 512);   */
 }
 
 /**
@@ -498,7 +504,7 @@ event dumpstep (t += 2.*pi/sqrt(g_*k_)/32) {
 
 #if TREE
 event adapt (i++) {
-  adapt_wavelet ({f}, (double[]){femax,uemax,uemax,uemax}, LEVEL, 6);
+  adapt_wavelet ({f}, (double[]){femax}, LEVEL, 5);
 }
 #endif
 

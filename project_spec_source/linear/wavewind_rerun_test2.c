@@ -1,5 +1,5 @@
 /** 
-    This is the wave wind interaction simulation with linear wind profile and adaptive grid.
+     This is the wave wind interaction simulation with linear wind profile and adaptive grid.
     Pressure is output on the run by output_matrix_mpi function and also dumped into dump file.
     For velocity initialization, velocity at the top is initialized with slope*height and kept 
     the same across x position. */
@@ -112,6 +112,7 @@ int countvelocity = 0;
 double k_ = 2.*pi;
 double h_ = 0.5;
 double g_ = 1.;
+double T0_ = 1;
 
 /** define the wind profile related parameters. */
 
@@ -121,8 +122,8 @@ double Karman = 0.41;   // Karman universal turbulence constant
 double UstarRATIO = 1;   // Ratio between Ustar and c
 double Ustar;
 double Utop;
-double y_1;
-double Udrift;   
+double y_1 = 0.;
+double Udrift = 0.;   
 
 /**
    The program takes optional arguments which are the level of
@@ -145,7 +146,7 @@ int main (int argc, char * argv[])
   if (argc > 7)
     UstarRATIO = atof(argv[7]);
   if (argc > 8)
-    DIRAC = atof(argv[8]);
+    DIRAC = atoi(argv[8]);
 
   /**
      Here we set the densities and viscosities corresponding to the
@@ -157,16 +158,15 @@ int main (int argc, char * argv[])
   mu2 = 1.0/RE*MURATIO;
   f.sigma = 1./(BO*sq(k_));
   G.y = -g_;  
-
+  T0_ = 2.*pi/sqrt(g_*k_ + f.sigma*k_*k_*k_/rho1);
   /**
      The domain is a cubic box centered on the origin and of length
      $L0=1$, periodic in the x- and z-directions. */
   
   Ustar = sqrt(g_/k_+f.sigma*k_)*UstarRATIO;
   Utop = sq(Ustar)/(mu2/rho2)*L0/2.;
-  y_1 = m*mu2/rho2/Ustar;
-  Udrift = B*Ustar;  
-
+  /* y_1 = m*mu2/rho2/Ustar; */
+  /* Udrift = B*Ustar;   */
   origin (-L0/2, -L0/2, -L0/2);
   periodic (right);
   u.n[top] = dirichlet(0);
@@ -180,7 +180,7 @@ int main (int argc, char * argv[])
      will be refined as required when initialising the wave. */
   
 #if TREE  
-  N = 32; // If coarsened or not
+  N = 1024; // If coarsened or not
 #else
   N = 1 << LEVEL;
 #endif
@@ -203,7 +203,7 @@ double wave (double x, double y) {
 			3.*sq(alpa) + 3.)*cube(a_)*sq(k_)*cos(k_*x) + 
     3./64.*(8.*cube(alpa)*cube(alpa) + 
 	    (sq(alpa) - 1.)*(sq(alpa) - 1.))*cube(a_)*sq(k_)*cos(3.*k_*x);
-  return eta1 + ak*eta2 + sq(ak)*eta3 - y;
+  return eta1 + eta2 + eta3 - y;
 }
 
 double eta (double x, double y) {
@@ -215,7 +215,7 @@ double eta (double x, double y) {
 			3.*sq(alpa) + 3.)*cube(a_)*sq(k_)*cos(k_*x) + 
     3./64.*(8.*cube(alpa)*cube(alpa) + 
 	    (sq(alpa) - 1.)*(sq(alpa) - 1.))*cube(a_)*sq(k_)*cos(3.*k_*x);
-  return eta1 + ak*eta2 + sq(ak)*eta3;
+  return eta1 + eta2 + eta3;
 }
 /**
 
@@ -259,7 +259,7 @@ event init (i = 0)
       	  cosh(2.0*k_*(y + h_))*sin(2.0*k_*x)/cosh(2.0*k_*h_);
       	double phi3 = 1./64.*(sq(alpa) - 1.)*(sq(alpa) + 3.)*
       	  (9.*sq(alpa) - 13.)*cosh(3.*k_*(y + h_))/cosh(3.*k_*h_)*a_*a_*k_*k_*A_*sin(3.*k_*x);
-      	Phi[] = phi1 + ak*phi2 + ak*ak*phi3;
+      	Phi[] = phi1 + phi2 + phi3;
       } 
       boundary ({Phi});
       if (DIRAC){
@@ -312,9 +312,10 @@ event init (i = 0)
        On trees, we repeat this initialisation until mesh adaptation does
        not refine the mesh anymore. */
 
-#if TREE  
-    while (adapt_wavelet ({f, u},
-			  (double[]){0.01,0.05,0.05,0.05}, LEVEL, 5).nf); //if not adapting anymore, return zero
+#if TREE 
+    while (0);
+    //while (adapt_wavelet ({f, u},
+    //			  (double[]){femax,100.*uemax,100.*uemax,100.*uemax}, LEVEL, 5).nf); //if not adapting anymore, return zero
 #else
     while (0);
 #endif
@@ -396,11 +397,11 @@ event graphs (i++) {
     fprintf (fpair, "t ke gpe dissipation\n");
   }
   fprintf (fpwater, "%g %g %g %g\n",
-	   t/(k_/sqrt(g_*k_)), ke/2., gpe + 0.125, dissWater);
+	   t, ke/2., gpe + 0.125*L0*L0*L0, dissWater);
   fprintf (fpair, "%g %g %g %g\n",
-	   t/(k_/sqrt(g_*k_)), keAir/2., gpeAir + 0.125, dissAir);
+	   t, keAir/2., gpeAir + 0.125*L0*L0*L0, dissAir);
   fprintf (ferr, "%g %g %g %g\n",
-	   t/(k_/sqrt(g_*k_)), ke/2., gpe + 0.125, dissWater);
+	   t, ke/2., gpe + 0.125*L0*L0*L0, dissWater);
 }
 
 /**
@@ -419,39 +420,11 @@ event graphs (i++) {
 event movies (t += 0.1) {
 
   /**
-     We first do simple movies of the volume fraction, level of
-     refinement fields. In 3D, these are in a $z=0$ cross-section. */
+     We do simple movies of the volume fraction, level of
+     refinement fields. */
 
-/*   { */
-/*     static FILE * fp = POPEN ("f", "a"); */
-/*     output_ppm (f, fp, min = 0, max = 1, n = 512); */
-/*   } */
-
-/* #if TREE */
-/*   { */
-/*     scalar l[]; */
-/*     foreach() */
-/*       l[] = level; */
-/*     static FILE * fp = POPEN ("level", "a"); */
-/*     output_ppm (l, fp, min = 5, max = LEVEL, n = 512); */
-/*   } */
-/* #endif */
-
-  /**
-     <p><center>
-     <video width="512" height="512" controls>
-     <source src="wave/level.mp4" type="video/mp4">
-     Your browser does not support the video tag.
-     </video><br>
-     Wave breaking. Animation of the level of refinement.
-     </center></p>
-
-     We use Basilisk view differently in 2D and 3D. */
-  
   scalar omega[];
   vorticity (u, omega);
-
-#if dimension == 2
   view (width = 800, height = 600, fov = 18.8);
   clear();
 
@@ -463,61 +436,10 @@ event movies (t += 0.1) {
       draw_vof ("f");
       squares ("omega", linear = true, max=50, min=-50);
     }
-
-  /**
-     This gives the following movie.
-     <p><center>
-     <video width="800" height="600" controls>
-     <source src="wave/movie.mp4" type="video/mp4">
-     Your browser does not support the video tag.
-     </video></center></p>
-  */
-#else // dimension == 3
-  /**
-     In 3D, we generate a first movie seen from below. */
-  
-  view (width = 1600, height = 1200, theta = pi/4, phi = -pi/6, fov = 20);
-  clear();
-  for (double x = -2*L0; x <= L0; x += L0)
-    translate (x) {
-      squares ("omega", linear = true, n = {0,0,1}, alpha = -L0/2);
-      for (double z = -3*L0; z <= L0; z += L0)
-	translate (z = z)
-	  draw_vof ("f");
-    }
-  {
-    static FILE * fp = POPEN ("below", "a");
-    save (fp = fp);
-  }
-
-  /**
-     And a second movie, seen from above. */
-  
-  view (width = 1600, height = 1200, theta = pi/4, phi = pi/6, fov = 20);
-  clear();
-
-  /**
-     In 3D, we are doubly-periodic (along x and z). */
-  
-  for (double x = -2*L0; x <= L0; x += L0)
-    translate (x) {
-      squares ("omega", linear = true, n = {0,0,1}, alpha = -L0/2);
-      for (double z = -3*L0; z <= L0; z += L0)
-	translate (z = z)
-	  draw_vof ("f");
-    }
-#endif 
   {
     static FILE * fp = POPEN ("omega", "a");
     save (fp = fp);
   }
-  clear();
-  squares("u.x", map = cool_warm, max=5, min=-5);
-  {
-    static FILE * fp = POPEN ("ux", "a");
-    save (fp = fp);
-  }
-
 }
 
 /**
@@ -536,7 +458,7 @@ event movies (t += 0.1) {
    The wave period is `k_/sqrt(g_*k_)`. We want to run up to 2
    (alternatively 4) periods. */
 
-event end (t = 10.*2.*pi/sqrt(g_*k_)) {
+event end (t = 10.*T0_) {
   fprintf (fout, "i = %d t = %g\n", i, t);
   dump ("end");
 }
@@ -545,32 +467,32 @@ event end (t = 10.*2.*pi/sqrt(g_*k_)) {
 /** 
     ## Dump every 1/32 period.  */
 
-event dumpstep (t += 2.*pi/sqrt(g_*k_)/32) {
+event dumpstep (t += T0_/32.) {
   char dname[100];
-  sprintf (dname, "dump%g", t/(k_/sqrt(g_*k_)));
+  sprintf (dname, "dump%g", t/T0_);
   p.nodump = false;
-  scalar p_air[],p_air_round[];
-  foreach(){
-    p_air[] = p[]*(1-f[]);
-    if (f[]<0.5){
-      p_air_round[] = p[];
-    }
-    else{
-      p_air_round[] = 0;
-    }
-  }
+  /* scalar p_air[],p_air_round[]; */
+  /* foreach(){ */
+  /*   p_air[] = p[]*(1-f[]); */
+  /*   if (f[]<0.5){ */
+  /*     p_air_round[] = p[]; */
+  /*   } */
+  /*   else{ */
+  /*     p_air_round[] = 0; */
+  /*   } */
+  /* } */
   dump (dname);
   // Output pressure
-  char pressurename1[100], pressurename2[100], pressurename3[100];
-  sprintf (pressurename1, "./pressure/p_matrix%g.dat", t/(k_/sqrt(g_*k_)));
-  sprintf (pressurename2, "./pressure/p_air_matrix%g.dat", t/(k_/sqrt(g_*k_)));
-  sprintf (pressurename3, "./pressure/p_air_round_matrix%g.dat", t/(k_/sqrt(g_*k_)));
-  FILE * fpressure1 = fopen (pressurename1, "w");  
-  output_matrix_mpi (p, fpressure1, n = 512);
-  FILE * fpressure2 = fopen (pressurename2, "w");  
-  output_matrix_mpi (p_air, fpressure2, n = 512);
-  FILE * fpressure3 = fopen (pressurename3, "w");  
-  output_matrix_mpi (p_air_round, fpressure3, n = 512);  
+  /* char pressurename1[100], pressurename2[100], pressurename3[100]; */
+  /* sprintf (pressurename1, "./pressure/p_matrix%g.dat", t/(k_/sqrt(g_*k_))); */
+  /* sprintf (pressurename2, "./pressure/p_air_matrix%g.dat", t/(k_/sqrt(g_*k_))); */
+  /* sprintf (pressurename3, "./pressure/p_air_round_matrix%g.dat", t/(k_/sqrt(g_*k_))); */
+  /* FILE * fpressure1 = fopen (pressurename1, "w");   */
+  /* output_matrix_mpi (p, fpressure1, n = 512); */
+  /* FILE * fpressure2 = fopen (pressurename2, "w");   */
+  /* output_matrix_mpi (p_air, fpressure2, n = 512); */
+  /* FILE * fpressure3 = fopen (pressurename3, "w");   */
+  /* output_matrix_mpi (p_air_round, fpressure3, n = 512);   */
 }
 
 /**

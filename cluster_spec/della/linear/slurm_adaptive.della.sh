@@ -1,23 +1,23 @@
 #!/bin/bash
-#SBATCH --nodes=4
+#SBATCH --nodes=1
 #SBATCH --ntasks-per-node=16
-#SBATCH --time=2:00:00
+#SBATCH --time=4:00:00
 #SBATCH --mail-type=end
 #SBATCH --mail-user=jiarongw@princeton.edu
 
 # This is a slurm script for Della
 #The executable name
-EXE=wavewind_linear_adaptive
+EXE=wavewind_rerun
 #Parameter value
-LEVEL=10
+LEVEL=8
 ak=0.05
-BO=3.34
-RE=31000. #Default 40000
+BO=1.47
+RE=10660. #Default 40000
 m=5
 B=0
-UstarRATIO=0.44
+UstarRATIO=0.7
 
-export ScratchDir="/scratch/gpfs/jiarongw/miscellaneous/linear_adaptive_varyslope_refineu001_m${m}B${B}Ustar${UstarRATIO}ak${ak}Bo${BO}Re${RE}LEVEL${LEVEL}"
+export ScratchDir="/scratch/gpfs/jiarongw/rerun/linear_${EXE}_Ustar${UstarRATIO}ak${ak}Bo${BO}Re${RE}LEVEL${LEVEL}"
 echo $ScratchDir
 rm -rf $ScratchDir
 mkdir -p $ScratchDir
@@ -26,7 +26,7 @@ cp /scratch/gpfs/jiarongw/executable/f$EXE/$EXE $ScratchDir
 cd $ScratchDir
 mkdir ./pressure
 mkdir ./shear
-srun ./$EXE $LEVEL $ak $BO $RE $m $B $UstarRATIO
+srun ./$EXE $LEVEL $ak $BO $RE $m $B $UstarRATIO 0 > message 2>&1
 
 #To move the whole directory to /tigress
 #cp -r $ScratchDir /tigress/jiarongw/
