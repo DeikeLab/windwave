@@ -11,10 +11,10 @@
 EXE=curved_fixREtau
 #Parameter value
 LEVEL=9
-RE_tau=180 #Default 40000
+RE_tau=360 #Default 40000
 BO=200
-g=1
-ak=0.1
+g=4
+ak=0.2
 emaxRATIO=0.3
 
 

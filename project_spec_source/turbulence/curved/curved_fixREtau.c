@@ -4,15 +4,15 @@
 #include "two-phase.h"
 #include "navier-stokes/conserving.h"
 #include "tension.h"
-#include "reduced.h"  //reduced gravity
+#include "reduced.h"  // reduced gravity
 #include "view.h"
 #include "tag.h"
 #include "lambda2.h"
 #include "navier-stokes/perfs.h"
 
 //#include "adapt_wavelet_limited.h"
-#include "sandbox/frac-dist.h"
-#include "sandbox/profile6.h"
+#include "sandbox/frac-dist.h" // extra headerfiles used in profiling function
+#include "sandbox/profile6.h"  // from Antoon
 
 double RELEASETIME = 200; 
 int MAXLEVEL = dimension == 2 ? 10 : 5; // max level if not use limited refinement
@@ -35,6 +35,8 @@ double uemaxRATIO = 0.01;
 #define RATIO 1.225/1000. //density ratio, air to water
 #define MURATIO 18.31e-6/10.0e-4 //dynamic viscosity ratio, air to water
 // kinematic viscosity air = 16*water
+double alter_MU = 1.; //not matching MURATIO extra factor. Default is 1, which 
+                      //means MURATIO is used.
 
 vector u_water[];
 
@@ -58,20 +60,22 @@ int main(int argc, char *argv[]) {
     RELEASETIME = atof(argv[6]);
   if (argc > 7)
     uemaxRATIO = atof(argv[7]);
-    
+  if (argc > 8)
+    alter_MU = atof(argv[8]);
+
   L0 = 2*pi;
-  h_ = 1;
-  k_ = 4;
+  h_ = 1; // Water depth
+  k_ = 4; // Four waves per box
   origin (-L0/2., 0, -L0/2.);
   // According to http://basilisk.fr/Basilisk%20C#boundary-conditions
   // for top, u.n = u.y, u.t = u.z, u.r = u.x
   u.r[top] = neumann(0);
   u.r[bottom] = neumann(0);
-  u.n[top] = dirichlet(0);
+  u.n[top] = dirichlet(0); // This is supposed to be neumann 
   u.n[bottom] = neumann(0);
   u.t[top] = neumann(0);
   u.t[bottom] = neumann(0);
-  // Test if setting to neumann change 
+  // TO-DO: Test if setting to neumann change 
   periodic (right);
   periodic (front);
   rho1 = 1.;
@@ -83,7 +87,7 @@ int main(int argc, char *argv[]) {
   Ustar = 0.25; // Pick a fixed value
   mu2 = Ustar*rho2*(L0-h_)/RE_tau;
   // mu1 = (2.*pi/k_)*c_*rho1/RE; // Depleted: using wavelength as length scale
-  mu1 = mu2/(MURATIO);
+  mu1 = mu2/(MURATIO)/alter_MU;
   RE = rho1*c_*(2*pi/k_)/mu1; // RE now becomes a dependent Non-dim number on c 
   fprintf (stderr, "g = %g, c = %g, Ustar = %g, MURATIO = %g, mu_w = %g, rho_w = %g, mu_a = %g, rho_a = %g, sigma = %g, Bo = %g, RE = %g, Re_tau = %g\n", g_, c_, Ustar, MURATIO, mu1, rho1, mu2, rho2, f.sigma, BO, RE, RE_tau);
   // Give the address of av to a so that acceleration can be changed
@@ -94,7 +98,6 @@ int main(int argc, char *argv[]) {
   fprintf (stderr, "RELEASETIME = %g, uemax = %g \n", RELEASETIME, uemax);
   run();
 }
-
 
 /** 
     Specify the interface shape. Since we are considering ak=0.1/0.2/0.3, 
@@ -261,7 +264,7 @@ event movies (t += 0.1) {
 }
 
 /**
-   Generate averaged profile in y direction o nthe fly. */
+   Generate averaged profile in y direction on the fly. */
 event profile_output (t += 1) {
   char file[99];
   sprintf (file, "prof_%g", t);
@@ -279,6 +282,8 @@ event profile_output (t += 1) {
   profiles ({u.x, u.y, u.z, uxuy, uxux, uyuy, uzuz}, phi, rf = 0.5, fname = file, min = 0.8, max = 2.*pi);
 }
 
+/** 
+    Outputting slices on the fly. */
 void sliceXY(char * fname,scalar s,double zp, int maxlevel){
   FILE *fpver =fopen (fname,"w"); 
   int nn = (1<<maxlevel);
@@ -330,6 +335,8 @@ event output_slice (t += 0.05)
   sliceXY (filename,f,zslice,MAXLEVEL);
 }
 
+/**
+   Output eta on the fly. */
 void output_twophase (double snapshot_time) {
   scalar pos[];
   coord G = {0.,1.,0.}, Z = {0.,0.,0.};
@@ -354,9 +361,7 @@ event eta_output (t > RELEASETIME; t +=0.1) {
 }
 
 /**
-   ## End 
-   The wave period is `k_/sqrt(g_*k_)`. We want to run up to 2
-   (alternatively 4) periods. */
+   ## End or dump regularly. */
 
 event end (t = 1000.) {
   fprintf (fout, "i = %d t = %g\n", i, t);
