@@ -326,19 +326,19 @@ void sliceXY(char * fname,scalar s,double zp, int maxlevel){
   matrix_free (field);
 }
 
-/* event output_slice (t += 0.05) */
-/* { */
-/*   char filename[100]; */
-/*   double zslice = 0.; */
-/*   sprintf (filename, "./field/ux_t%g_center", t); */
-/*   sliceXY (filename,u.x,zslice,MAXLEVEL-1); */
-/*   sprintf (filename, "./field/uy_t%g_center", t); */
-/*   sliceXY (filename,u.y,zslice,MAXLEVEL-1); */
-/*   sprintf (filename, "./field/uz_t%g_center", t); */
-/*   sliceXY (filename,u.z,zslice,MAXLEVEL-1); */
-/*   sprintf (filename, "./field/f_t%g_center", t); */
-/*   sliceXY (filename,f,zslice,MAXLEVEL-1); */
-/* } */
+event output_slice (t += 0.05)
+{
+  char filename[100];
+  double zslice = 0.;
+  sprintf (filename, "./field/ux_t%g_center", t);
+  sliceXY (filename,u.x,zslice,MAXLEVEL-1);
+  sprintf (filename, "./field/uy_t%g_center", t);
+  sliceXY (filename,u.y,zslice,MAXLEVEL-1);
+  sprintf (filename, "./field/uz_t%g_center", t);
+  sliceXY (filename,u.z,zslice,MAXLEVEL-1);
+  sprintf (filename, "./field/f_t%g_center", t);
+  sliceXY (filename,f,zslice,MAXLEVEL-1);
+}
 
 /**
    Output eta on the fly. */
@@ -374,13 +374,12 @@ event end (t = 1000.) {
   dump ("end");
 }
 
-
 event dumpstep (t += 1) {
   char dname[100];
-  // p.nodump = false;
   u_water.x.nodump = true;
   u_water.y.nodump = true;
   u_water.z.nodump = true;
+  // p.nodump = false;
   sprintf (dname, "dump%g", t);
   dump (dname);
 }

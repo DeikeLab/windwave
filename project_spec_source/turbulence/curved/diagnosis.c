@@ -7,9 +7,9 @@
 #include "view.h"
 #include "lambda2.h"
 
-#define POPEN(name, mode) fopen (name ".ppm", mode)
+
 double snapshot_time = 0;
-int MAXLEVEL=7;
+int OUTLEVEL=7;
 
 void sliceXZ(char * fname,scalar s,double yp, int maxlevel){
   FILE *fpver =fopen (fname,"w"); 
@@ -33,7 +33,7 @@ void sliceXZ(char * fname,scalar s,double yp, int maxlevel){
 #endif
     for (int i = 0; i < nn; i++) {
       for (int j = 0; j < nn; j++) {
-	fprintf (fpver, "%g\t", field[i][j]);
+	fprintf (fpver, "%.9g\t", field[i][j]);
       }
       fputc ('\n', fpver);
     }
@@ -92,22 +92,24 @@ void output_slice ()
   for (int i=0; i<Nslice; i++) {
     zslice += L0/Nslice;
     sprintf (filename, "./field/ux_t%g_slice%d", snapshot_time, i);
-    sliceXY (filename,u.x,zslice,MAXLEVEL);
+    sliceXY (filename,u.x,zslice,OUTLEVEL);
     sprintf (filename, "./field/uy_t%g_slice%d", snapshot_time, i);
-    sliceXY (filename,u.y,zslice,MAXLEVEL);
+    sliceXY (filename,u.y,zslice,OUTLEVEL);
     sprintf (filename, "./field/f_t%g_slice%d", snapshot_time, i);
-    sliceXY (filename,f,zslice,MAXLEVEL);
+    sliceXY (filename,f,zslice,OUTLEVEL);
+    /* sprintf (filename, "./field/p_t%g_slice%d", snapshot_time, i); */
+    /* sliceXY (filename,p,zslice,OUTLEVEL); */
   } 
   /* double L0 = 2*pi; */
   /* double yslice = pi/Nslice; */
   /* for (int i=0; i<Nslice; i++) { */
   /*   yslice += L0/Nslice; */
   /*   sprintf (filename, "./field/ux_t%g_slice%d", snapshot_time, i); */
-  /*   sliceXZ (filename,u.x,yslice,MAXLEVEL); */
+  /*   sliceXZ (filename,u.x,yslice,OUTLEVEL); */
   /*   sprintf (filename, "./field/uy_t%g_slice%d", snapshot_time, i); */
-  /*   sliceXZ (filename,u.y,yslice,MAXLEVEL); */
+  /*   sliceXZ (filename,u.y,yslice,OUTLEVEL); */
   /*   sprintf (filename, "./field/f_t%g_slice%d", snapshot_time, i); */
-  /*   sliceXZ (filename,f,yslice,MAXLEVEL); */
+  /*   sliceXZ (filename,f,yslice,OUTLEVEL); */
   /* }   */
 }
 
@@ -135,17 +137,18 @@ void output ()
   fclose (fp);
 }
 
+scalar wateru[];
 void output_twophase () {
-  scalar wateru[];
   foreach () {
     wateru[] = u.x[]*f[];
   }
   squares("wateru", n = {0, 0, 1}, alpha = 0);
+  save ("uwater.ppm");
   scalar pos[];
   coord G = {0.,1.,0.}, Z = {0.,0.,0.};
   position (f, pos, G, Z);
   char etaname[100];
-  sprintf (etaname, "./eta/eta_t%g", snapshot_time);
+  sprintf (etaname, "./eta/eta_t%g_%d", snapshot_time, pid());
   FILE * feta = fopen (etaname, "w");
   fprintf(feta, "x,z,pos,p,p_p1,p_p2\n");
   // printing out quantities: p_p1 for p at plus 1, p_m1 for p at minus 1 etc.
@@ -159,34 +162,69 @@ void output_twophase () {
   fclose (feta);
 } 
 
-
-int main (int argc, char * argv[] )
-{
+int main(int argc, char *argv[]) {
   if (argc > 1)
     snapshot_time = atof(argv[1]);
   if (argc > 2)
-    MAXLEVEL = atoi(argv[2]);
+    OUTLEVEL = atoi(argv[2]);
+
+  run();
+}
+
+event init(i=0)
+{
   char targetname[100];
   sprintf (targetname, "dump%g", snapshot_time);
   if (!restore (targetname)) {
     fprintf(ferr, "Not restored!\n");
     return 1;
   }
-  L0 = 2.*pi;
-  restore (targetname);
-  output_twophase ();
+  //output_twophase();
   output_slice();
-  //output();
-  //movies();
-  run();
 }
-
-/* event run_output (i=0) */
-/* { */
-/* 	/\* refine (level < 8); *\/ */
-/* 	output (); */
-/* 	cells (n = {0, 0, 1}, alpha = -pi); */
-/* 	squares ("u.x", n = {0, 0, 1}, alpha = -pi); */
-/* 	save ("ux.ppm"); */
-/* 	return 1; */
+/* event acceleration (i++) { */
+/*   double ampl = sq(Ustar)/(L0-h_); */
+/*   foreach_face(x) */
+/*     av.x[] += ampl*(1.-f[]); */
 /* } */
+
+/* event p_air (i=5) */
+/* { */
+/*   scalar pair[]; */
+/*   foreach () { */
+/*     pair[] = p[]*(1.-f[]); */
+/*   } */
+/*   squares ("pair", n = {0,0,1}, alpha = -0.1); */
+/*   save ("pair.ppm"); */
+/*   cells (n = {0,0,1}, alpha = -0.1); */
+/*   squares ("level", n = {0,0,1}, alpha = -0.1, max = 10, min = 5); */
+/*   save ("LEVEL.ppm"); */
+
+/*   char filename[100]; */
+/*   int Nslice = 256; */
+/*   double L0 = 2*pi; */
+/*   double zslice = -L0/2+L0/2./Nslice; */
+/*   for (int i=0; i<Nslice; i++) { */
+/*     zslice += L0/Nslice; */
+/*     sprintf (filename, "./field/p_run_t%g_slice%d", snapshot_time, i); */
+/*     sliceXY (filename,p,zslice,OUTLEVEL); */
+/*     sprintf (filename, "./field/pair_run_t%g_slice%d", snapshot_time, i); */
+/*     sliceXY (filename,pair,zslice,OUTLEVEL); */
+/*   }    */
+/* } */
+
+/* #if TREE */
+/* event adapt (i++) { */
+/*   if (i == 5) */
+/*     fprintf(stderr, "uemaxRATIO = %g\n", uemaxRATIO); */
+/*   if (t < RELEASETIME) */
+/*     adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, MAXLEVEL); */
+/*   if (t >= RELEASETIME) { */
+/*     foreach () { */
+/*       foreach_dimension () */
+/* 	u_water.x[] = u.x[]*f[]; */
+/*     } */
+/*     adapt_wavelet ({f,u,u_water}, (double[]){femax,uemax,uemax,uemax,0.001,0.001,0.001}, MAXLEVEL); */
+/*   } */
+/* } */
+/* #endif */
