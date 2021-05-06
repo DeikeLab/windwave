@@ -14,8 +14,6 @@
 #include "sandbox/frac-dist.h" // extra headerfiles used in profiling function
 #include "sandbox/profile6.h"  // from Antoon
 
-#define POPEN(name, mode) fopen (name ".ppm", mode)
-
 double RELEASETIME = 200; 
 int MAXLEVEL = dimension == 2 ? 10 : 5; // max level if not use limited refinement
 
@@ -74,7 +72,7 @@ int main(int argc, char *argv[]) {
   u.r[top] = neumann(0);
   u.r[bottom] = neumann(0);
   u.n[top] = dirichlet(0); // This is supposed to be neumann 
-  u.n[bottom] = dirichlet(0);
+  u.n[bottom] = neumann(0);
   u.t[top] = neumann(0);
   u.t[bottom] = neumann(0);
   // TO-DO: Test if setting to neumann change 
@@ -256,15 +254,11 @@ event movies (t += 0.1) {
   char s[80];
   sprintf (s, "t = %0.1f", t);
   draw_string (s, size = 30);
+  // scalar l2[];
+  // lambda2 (u, l2);
+  // isosurface ("l2", -1);
   {
     static FILE * fp = POPEN ("3D", "a");
-    save (fp = fp);
-  }
-  scalar l2[];
-  lambda2 (u, l2);
-  isosurface ("l2", -1);
-  {
-    static FILE * fp = POPEN ("vortex", "a");
     save (fp = fp);
   }
 }
@@ -326,19 +320,19 @@ void sliceXY(char * fname,scalar s,double zp, int maxlevel){
   matrix_free (field);
 }
 
-/* event output_slice (t += 0.05) */
-/* { */
-/*   char filename[100]; */
-/*   double zslice = 0.; */
-/*   sprintf (filename, "./field/ux_t%g_center", t); */
-/*   sliceXY (filename,u.x,zslice,MAXLEVEL-1); */
-/*   sprintf (filename, "./field/uy_t%g_center", t); */
-/*   sliceXY (filename,u.y,zslice,MAXLEVEL-1); */
-/*   sprintf (filename, "./field/uz_t%g_center", t); */
-/*   sliceXY (filename,u.z,zslice,MAXLEVEL-1); */
-/*   sprintf (filename, "./field/f_t%g_center", t); */
-/*   sliceXY (filename,f,zslice,MAXLEVEL-1); */
-/* } */
+event output_slice (t += 0.05)
+{
+  char filename[100];
+  double zslice = 0.;
+  sprintf (filename, "./field/ux_t%g_center", t);
+  sliceXY (filename,u.x,zslice,MAXLEVEL-1);
+  sprintf (filename, "./field/uy_t%g_center", t);
+  sliceXY (filename,u.y,zslice,MAXLEVEL-1);
+  sprintf (filename, "./field/uz_t%g_center", t);
+  sliceXY (filename,u.z,zslice,MAXLEVEL-1);
+  sprintf (filename, "./field/f_t%g_center", t);
+  sliceXY (filename,f,zslice,MAXLEVEL-1);
+}
 
 /**
    Output eta on the fly. */
@@ -374,13 +368,9 @@ event end (t = 1000.) {
   dump ("end");
 }
 
-
 event dumpstep (t += 1) {
   char dname[100];
-  // p.nodump = false;
-  u_water.x.nodump = true;
-  u_water.y.nodump = true;
-  u_water.z.nodump = true;
+  p.nodump = false;
   sprintf (dname, "dump%g", t);
   dump (dname);
 }
@@ -398,7 +388,7 @@ event adapt (i++) {
       foreach_dimension ()
 	u_water.x[] = u.x[]*f[];
     }
-    adapt_wavelet ({f,u,u_water}, (double[]){femax,uemax,uemax,uemax,0.001,0.001,0.001}, MAXLEVEL);
+    adapt_wavelet ({f,u,u_water}, (double[]){femax,uemax,uemax,uemax,0.001,0.001,0.001}, MAXLEVEL+1);
   }
 }
 #endif

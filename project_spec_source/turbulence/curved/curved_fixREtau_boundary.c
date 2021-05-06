@@ -14,6 +14,8 @@
 #include "sandbox/frac-dist.h" // extra headerfiles used in profiling function
 #include "sandbox/profile6.h"  // from Antoon
 
+#define POPEN(name, mode) fopen (name ".ppm", mode)
+
 double RELEASETIME = 200; 
 int MAXLEVEL = dimension == 2 ? 10 : 5; // max level if not use limited refinement
 
@@ -72,7 +74,7 @@ int main(int argc, char *argv[]) {
   u.r[top] = neumann(0);
   u.r[bottom] = neumann(0);
   u.n[top] = dirichlet(0); // This is supposed to be neumann 
-  u.n[bottom] = neumann(0);
+  u.n[bottom] = dirichlet(0);
   u.t[top] = neumann(0);
   u.t[bottom] = neumann(0);
   // TO-DO: Test if setting to neumann change 
@@ -214,6 +216,16 @@ double u_y (double x, double y)
     3.*k_*sinh(3.*k_*(y + h_))/cosh(3.*k_*h_)*ak*ak*A_*sin(3.*k_*x);
 }
 
+event start(t = RELEASETIME) {
+  // A slightly changed version of stokes wave as y = 0 at the bottom now so y+h -> y
+  fraction (f, WaveProfile(x,z)-y);
+  foreach () {
+    u.x[] += u_x(x, y-h_)*f[];
+    u.y[] += u_y(x, y-h_)*f[];
+  }
+  boundary ((scalar *){u});
+}
+
 /**
    Forcing term equivalent to pressure gradient in x. */
 event acceleration (i++) {
@@ -244,11 +256,15 @@ event movies (t += 0.1) {
   char s[80];
   sprintf (s, "t = %0.1f", t);
   draw_string (s, size = 30);
-  // scalar l2[];
-  // lambda2 (u, l2);
-  // isosurface ("l2", -1);
   {
     static FILE * fp = POPEN ("3D", "a");
+    save (fp = fp);
+  }
+  scalar l2[];
+  lambda2 (u, l2);
+  isosurface ("l2", -1);
+  {
+    static FILE * fp = POPEN ("vortex", "a");
     save (fp = fp);
   }
 }
@@ -314,15 +330,14 @@ event output_slice (t += 0.05)
 {
   char filename[100];
   double zslice = 0.;
-  int MAXLEVEL = 8;
-  sprintf (filename, "./field/ux_center_t%g", t);
-  sliceXY (filename,u.x,zslice,MAXLEVEL);
-  sprintf (filename, "./field/uy_center_t%g", t);
-  sliceXY (filename,u.y,zslice,MAXLEVEL);
+  sprintf (filename, "./field/ux_t%g_center", t);
+  sliceXY (filename,u.x,zslice,MAXLEVEL-1);
+  sprintf (filename, "./field/uy_t%g_center", t);
+  sliceXY (filename,u.y,zslice,MAXLEVEL-1);
   sprintf (filename, "./field/uz_t%g_center", t);
-  sliceXY (filename,u.z,zslice,MAXLEVEL);
+  sliceXY (filename,u.z,zslice,MAXLEVEL-1);
   sprintf (filename, "./field/f_t%g_center", t);
-  sliceXY (filename,f,zslice,MAXLEVEL);
+  sliceXY (filename,f,zslice,MAXLEVEL-1);
 }
 
 /**
@@ -332,7 +347,7 @@ void output_twophase (double snapshot_time) {
   coord G = {0.,1.,0.}, Z = {0.,0.,0.};
   position (f, pos, G, Z);
   char etaname[100];
-  sprintf (etaname, "./eta/eta_t%g", snapshot_time);
+  sprintf (etaname, "./eta/eta_t%g_%d", snapshot_time, pid());
   FILE * feta = fopen (etaname, "w");
   fprintf(feta, "x,z,pos,p,p_p1,p_p2\n");
   // printing out quantities: p_p1 for p at plus 1, p_m1 for p at minus 1 etc.
@@ -346,8 +361,9 @@ void output_twophase (double snapshot_time) {
   fclose (feta);
 } 
 
-event eta_output (t > RELEASETIME; t +=0.1) {
-  output_twophase (t);
+event eta_output (t += 0.1) {
+  if (t > RELEASETIME) // Event does not take variable time condition 
+    output_twophase (t);
 }
 
 /**
@@ -360,7 +376,10 @@ event end (t = 1000.) {
 
 event dumpstep (t += 1) {
   char dname[100];
-  p.nodump = false;
+  u_water.x.nodump = true;
+  u_water.y.nodump = true;
+  u_water.z.nodump = true;
+  // p.nodump = false;
   sprintf (dname, "dump%g", t);
   dump (dname);
 }
