@@ -12,8 +12,8 @@
 #include "view.h"
 #include "tag.h"
 #include "navier-stokes/perfs.h"
-#include "tracer-particles.h"
-#include "scatter2.h"
+#include "sandbox/tracer-particles.h"
+#include "sandbox/scatter2.h"
 
 /**
     Output pressure matrix on the run. */

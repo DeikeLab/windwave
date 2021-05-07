@@ -262,7 +262,14 @@ event movies (t += 0.1) {
   }
   scalar l2[];
   lambda2 (u, l2);
+  view (fov = 40, camera = "iso", ty = -0.25,
+  width = 600, height = 600, bg = {1,1,1}, samples = 4);
+  squares ("u.y", linear = true, n = {0,0,1}, alpha = -3.1415);
+  squares ("u.x", linear = true, n = {1,0,0}, alpha = -3.1415);
+  cells (n = {1,0,0}, alpha = -3.1415);
+  draw_vof ("f", color = "u.x");
   isosurface ("l2", -1);
+  draw_string (s, size = 30);
   {
     static FILE * fp = POPEN ("vortex", "a");
     save (fp = fp);
