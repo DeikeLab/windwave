@@ -12,8 +12,8 @@
 #include "view.h"
 #include "tag.h"
 #include "navier-stokes/perfs.h"
-#include "tracer-particles.h"
-#include "scatter2.h"
+#include "sandbox/tracer-particles.h"
+#include "sandbox/scatter2.h"
 
 /**
     Output pressure matrix on the run. */
@@ -128,6 +128,7 @@ double Ustar;
 double Utop;
 double y_1 = 0.;
 double Udrift = 0.;   
+vector uwater[];
 
 /**
    The program takes optional arguments which are the level of
@@ -241,7 +242,7 @@ double gaus (double y, double yc, double T){
    using the third-order Stokes wave solution. */
 event init (i = 0)
 {
-  fprintf(stderr, "UstarRATIO=%g B=%g\n m=%g ak=%g", UstarRATIO, B, m, ak);
+  fprintf(stderr, "UstarRATIO=%g B=%g\n m=%g ak=%g\n", UstarRATIO, B, m, ak);
 
   if (!restore ("restart")) {
     do {
@@ -324,20 +325,46 @@ event init (i = 0)
     while (0);
 #endif
     //fprintf(stderr, "break3!");
-    g_ = 1.;
-  }
-
+  g_ = 1.;
   /** 
       Initialize some tracer particles. */
-  pa = new_tracer_particles (10);
-  int j = 0;
-  while (j < 10) {
-    pl[pa][j].x = - 0.4;
-    pl[pa][j].y = - 0.5 + 0.5*j/10.;
-    j++;
+  if (pid() == 0) {
+    pa = new_tracer_particles (10);
+    int j = 0;
+    while (j < 10) {
+      pl[pa][j].x = - 0.4;
+      pl[pa][j].y = - 0.5 + 0.5*j/10.;
+      j++;
+    }
+  }  
+  else {
+    pa = new_tracer_particles (0);
+  }
+  fprintf (stderr, "pn[0] = %d, pna[0] = %d\n", pn[0], pna[0]);
+  // Sanity check
+  foreach_particle () {
+    fprintf (stderr, "x = %g, y = %g, j = %d\n", x, y, j);
   }
   particle_boundary (pa);
   set_particle_attributes (pa);
+  }
+  else {
+    prestore ("prestart");
+    pa = 0;
+    tracer_particles = realloc (tracer_particles, 1*sizeof(Particles));
+    tracer_particles[0] = pa; // Intialize the tracer_particles list 
+    particle_boundary (pa);
+    set_particle_attributes (pa);
+    fprintf (stderr, "Restored!\n");
+    foreach_P_in_list (tracer_particles) {
+      fprintf (stderr, "P = %d\n", P);
+      /* foreach_particle_in (P) { */
+      /* 	fprintf (stderr, "y = %g, j = %d\n", y, j); */
+      /* } */
+    }
+    fprintf (stderr, "pn[0] = %d, pna[0] = %d\n", pn[0], pna[0]);
+    fflush (stderr);
+  }
 }
 
 /**
@@ -419,6 +446,28 @@ event graphs (i++) {
 	   t, keAir/2., gpeAir + 0.125, dissAir);
   fprintf (ferr, "%g %g %g %g\n",
 	   t, ke/2., gpe + 0.125, dissWater);
+}
+
+event output_particle (i+=200) {
+  char filename[100];
+  static FILE * fpa;
+  fprintf (stderr, "pn[0] = %d, pna[0] = %d, pa = %d\n", pn[0], pna[0], pa);
+  // There seems to be a copy of the particle for every process
+  /* foreach_particle () { */
+  /*   fprintf (stderr, "x = %g, y = %g, j = %d, pid = %d\n", x, y, j, pid()); */
+  /* } */
+  for (int j = 0; j < 10; j++) {
+    if (pid() == 0) {
+      sprintf (filename, "particle%d.dat", j);
+      fpa = fopen (filename, "a");
+      if (i == 0) {
+	fprintf (fpa, "t x y\n");
+      }
+      fprintf (fpa, "%g %g %g\n",t,pl[pa][j].x,pl[pa][j].y);
+      fflush (fpa);
+      fclose (fpa);
+    }
+  }
 }
 
 /**
@@ -508,17 +557,8 @@ event dumpstep (t += T0_/32.) {
   /*   } */
   /* } */
   dump (dname);
-  // Output pressure
-  /* char pressurename1[100], pressurename2[100], pressurename3[100]; */
-  /* sprintf (pressurename1, "./pressure/p_matrix%g.dat", t/(k_/sqrt(g_*k_))); */
-  /* sprintf (pressurename2, "./pressure/p_air_matrix%g.dat", t/(k_/sqrt(g_*k_))); */
-  /* sprintf (pressurename3, "./pressure/p_air_round_matrix%g.dat", t/(k_/sqrt(g_*k_))); */
-  /* FILE * fpressure1 = fopen (pressurename1, "w");   */
-  /* output_matrix_mpi (p, fpressure1, n = 512); */
-  /* FILE * fpressure2 = fopen (pressurename2, "w");   */
-  /* output_matrix_mpi (p_air, fpressure2, n = 512); */
-  /* FILE * fpressure3 = fopen (pressurename3, "w");   */
-  /* output_matrix_mpi (p_air_round, fpressure3, n = 512);   */
+  sprintf (dname, "pa%g", t/T0_);
+  pdump (dname);
 }
 
 /**
@@ -529,7 +569,13 @@ event dumpstep (t += T0_/32.) {
 
 #if TREE
 event adapt (i++) {
-  adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, LEVEL, 5);
+  //fprintf (stderr, "Adapt! i = %d\n", i);
+  foreach () {
+    foreach_dimension ()
+      uwater.x[] = u.x[]*f[];
+  }
+  adapt_wavelet ({f,u,uwater}, (double[]){femax,uemax,uemax,uemax,0.0005,0.0005,0.0005}, LEVEL, 5);
+  //  adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, LEVEL, 5);
 }
 #endif
 

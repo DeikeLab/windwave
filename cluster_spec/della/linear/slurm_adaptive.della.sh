@@ -1,23 +1,23 @@
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=16
-#SBATCH --time=8:00:00
+#SBATCH --time=04:00:00
 #SBATCH --mail-type=end
 #SBATCH --mail-user=jiarongw@princeton.edu
 
 # This is a slurm script for Della
 # The executable name
-EXE=wavewind_rerun_test
+EXE=wavewind_rerun_test_particle
 #Parameter value
-LEVEL=11
-ak=0.05
-BO=200
-RE=10660. #Default 40000
+LEVEL=12
+ak=0
+BO=0.53
+RE=5000. #Default 40000
 m=5
 B=0
-UstarRATIO=1
+UstarRATIO=0.5
 
-export ScratchDir="/scratch/gpfs/jiarongw/rerun/linear_${EXE}_Ustar${UstarRATIO}ak${ak}Bo${BO}Re${RE}LEVEL${LEVEL}"
+export ScratchDir="/scratch/gpfs/jiarongw/rerun/linear_${EXE}_Ustar${UstarRATIO}ak${ak}Bo${BO}Re${RE}LEVEL${LEVEL}_uwater"
 echo $ScratchDir
 rm -rf $ScratchDir
 mkdir -p $ScratchDir
