@@ -13,13 +13,14 @@ MPICCFLAGS += -Wall -O2 -std=c99 -D_MPI=1
 #MPICCFLAGS += -Wall -std=c99 -O1 -D_MPI=1 -fno-strict-aliasing
 BAS=qcc
 MPICC = mpicc 
-LDFLAGS = -lm -lgfortran -L${BASILISK}/ppr -lppr -lm
+LDFLAGS = -lm
 CC99='mpicc -std=c99'
-OPENGLINC = -I${HOME}/local/include
-OPENGLIBS = -L${BASILISK}/gl -lglutils -lfb_osmesa -L${HOME}/local/lib -lGLU -L${HOME}/local/lib -lOSMesa 
+#OPENGLINC = -I${BASILISK}/wsServer/include
+#OPENGLIBS = -L${BASILISK}/gl -L${BASILISK}/wsServer -lglutils -lfb_dumb -lws
 
 #MAKE COMMAND: TAKES ARGUMENT AND MAKES EXECUTABLE IN DESIRED FOLDER
 $(OUTPUT): 
 #	${CC99} $(BAS) $(CFLAGS) $(SRC_FILES) -o $(OUT_FOLDER)/$(OUTPUT) $(LDFLAGS)
 	$(BAS) $(CFLAGS) $(SRC_FILES)
-	$(MPICC) $(MPICCFLAGS) $(MPI_FILES) -I$(BASILISK) ${OPENGLINC} ${OPENGLIBS} -o $(OUT_FOLDER)/$(OUTPUT) $(LDFLAGS)
+	$(MPICC) $(MPICCFLAGS) $(MPI_FILES) -I$(BASILISK) -o $(OUT_FOLDER)/$(OUTPUT) $(LDFLAGS)
+

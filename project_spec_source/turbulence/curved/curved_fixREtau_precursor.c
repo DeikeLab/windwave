@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
   u.r[top] = neumann(0);
   u.r[bottom] = neumann(0);
   u.n[top] = dirichlet(0);
-  u.n[bottom] = neumann(0);
+  u.n[bottom] = dirichlet(0);
   u.t[top] = neumann(0);
   u.t[bottom] = neumann(0);
   // Test if setting to neumann change 
@@ -277,7 +277,7 @@ void sliceXY(char * fname,scalar s,double zp, int maxlevel){
   matrix_free (field);
 }
 
-event output_slice (t += 1)
+event output_slice (t += 10)
 {
   char filename[100];
   double zslice = 0.;
@@ -294,7 +294,7 @@ event output_slice (t += 1)
 
 event dumpstep (t += 5) {
   char dname[100];
-  p.nodump = false;
+  //p.nodump = false;
   sprintf (dname, "dump%g", t);
   dump (dname);
 }
