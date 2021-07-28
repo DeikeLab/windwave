@@ -8,16 +8,16 @@
 #SBATCH --mail-user=jiarongw@princeton.edu
 
 #The executable name
-EXE=curved_fixREtau
+EXE=curved_fixREtau_boundary
 #Parameter value
 LEVEL=10
 RE_tau=720 
 BO=200
-g=4
+g=1
 ak=0.2
 TIME=57
 emaxRATIO=0.3
-alterMU=8
+alterMU=16
 
 export ScratchDir="/scratch/gpfs/jiarongw/turbulence/${EXE}_REtau${RE_tau}_BO${BO}_g${g}_ak${ak}_MU${alterMU}_LEVEL${LEVEL}_emax${emaxRATIO}"
 echo $ScratchDir

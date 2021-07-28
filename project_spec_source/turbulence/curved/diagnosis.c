@@ -113,6 +113,7 @@ void output_slice ()
   /* }   */
 }
 
+/** Not used direct otput of fields. */
 void output ()
 {
   char filename[100];
@@ -137,6 +138,7 @@ void output ()
   fclose (fp);
 }
 
+/** Output interface info. Deprecated because of added runtime output. */
 scalar wateru[];
 void output_twophase () {
   foreach () {
@@ -162,12 +164,72 @@ void output_twophase () {
   fclose (feta);
 } 
 
+/** Output dissipation in one text file. May not be in the time order. */
+void dissipation () {
+  /* coord ubar; */
+  /* foreach_dimension() { */
+  /*   stats s = statsf(u.x); */
+  /*   ubar.x = s.sum/s.volume; */
+  /* } */
+  char dissname[100] = "dissipation.dat";
+  FILE * fp = fopen (dissname, "a");
+  if (snapshot_time == 0) {
+    fprintf(fp, "t,diss\n");
+  }
+  double ke = 0., vd = 0., vol = 0.;
+  foreach(reduction(+:ke) reduction(+:vd) reduction(+:vol)) {
+    vol += dv()*f[]; // Only count the water phase
+    foreach_dimension() {
+      // mean fluctuating kinetic energy
+      // ke += dv()*sq(u.x[] - ubar.x);
+      // viscous dissipation
+      vd += sqrt(f[])*f[]*dv()*(sq(u.x[1] - u.x[-1]) +
+		      sq(u.x[0,1] - u.x[0,-1]))/sq(2.*Delta);
+    }
+  }
+  // ke /= 2.*vol;
+  vd *= mu1;
+
+  /* if (i == 0) */
+  /*   fprintf (stderr, "t dissipation energy Reynolds\n"); */
+  fprintf (fp, "%g,%g \n", snapshot_time, vd);
+}
+
+/**
+   Output the underwater velocity as supplementary info for runtime eta file. */
+
+void output_twophase_locate () {
+  scalar pos[];
+  coord G = {0.,1.,0.}, Z = {0.,0.,0.};
+  position (f, pos, G, Z);
+  char etaname[100];
+  sprintf (etaname, "./eta/eta_supplement_t%g", snapshot_time);
+  FILE * feta = fopen (etaname, "w");
+  fprintf(feta, "x,z,uxw,uyw\n");
+  // printing out quantities: p_p1 for p at plus 1, p_m1 for p at minus 1 etc.
+  double stp = L0/256.;
+  foreach(){
+    if (interfacial (point, f)){
+      if (point.level == 10) {
+	fprintf (feta, "%g,%g,", x, z);
+	/** Find the water side velocity. */
+ 	double yp = y - stp;
+	point = locate (x, yp);
+	if (point.level > 0) {
+	  fprintf (feta, "%g,%g\n", u.x[], u.y[]);
+	}
+      }
+    }
+  }
+  fflush (feta);
+  fclose (feta);
+}
+
 int main(int argc, char *argv[]) {
   if (argc > 1)
     snapshot_time = atof(argv[1]);
   if (argc > 2)
     OUTLEVEL = atoi(argv[2]);
-
   run();
 }
 
@@ -179,52 +241,6 @@ event init(i=0)
     fprintf(ferr, "Not restored!\n");
     return 1;
   }
-  //output_twophase();
+  output_twophase_locate();
   output_slice();
 }
-/* event acceleration (i++) { */
-/*   double ampl = sq(Ustar)/(L0-h_); */
-/*   foreach_face(x) */
-/*     av.x[] += ampl*(1.-f[]); */
-/* } */
-
-/* event p_air (i=5) */
-/* { */
-/*   scalar pair[]; */
-/*   foreach () { */
-/*     pair[] = p[]*(1.-f[]); */
-/*   } */
-/*   squares ("pair", n = {0,0,1}, alpha = -0.1); */
-/*   save ("pair.ppm"); */
-/*   cells (n = {0,0,1}, alpha = -0.1); */
-/*   squares ("level", n = {0,0,1}, alpha = -0.1, max = 10, min = 5); */
-/*   save ("LEVEL.ppm"); */
-
-/*   char filename[100]; */
-/*   int Nslice = 256; */
-/*   double L0 = 2*pi; */
-/*   double zslice = -L0/2+L0/2./Nslice; */
-/*   for (int i=0; i<Nslice; i++) { */
-/*     zslice += L0/Nslice; */
-/*     sprintf (filename, "./field/p_run_t%g_slice%d", snapshot_time, i); */
-/*     sliceXY (filename,p,zslice,OUTLEVEL); */
-/*     sprintf (filename, "./field/pair_run_t%g_slice%d", snapshot_time, i); */
-/*     sliceXY (filename,pair,zslice,OUTLEVEL); */
-/*   }    */
-/* } */
-
-/* #if TREE */
-/* event adapt (i++) { */
-/*   if (i == 5) */
-/*     fprintf(stderr, "uemaxRATIO = %g\n", uemaxRATIO); */
-/*   if (t < RELEASETIME) */
-/*     adapt_wavelet ({f,u}, (double[]){femax,uemax,uemax,uemax}, MAXLEVEL); */
-/*   if (t >= RELEASETIME) { */
-/*     foreach () { */
-/*       foreach_dimension () */
-/* 	u_water.x[] = u.x[]*f[]; */
-/*     } */
-/*     adapt_wavelet ({f,u,u_water}, (double[]){femax,uemax,uemax,uemax,0.001,0.001,0.001}, MAXLEVEL); */
-/*   } */
-/* } */
-/* #endif */

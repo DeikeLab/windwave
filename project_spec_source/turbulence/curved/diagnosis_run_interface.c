@@ -184,14 +184,15 @@ void output_twophase () {
   fclose (feta);
 }
 
-void output_twophase_locate () {
+
+void output_twophase_locate (double snapshot_time) {
   scalar pos[];
   coord G = {0.,1.,0.}, Z = {0.,0.,0.};
   position (f, pos, G, Z);
   char etaname[100];
   sprintf (etaname, "./eta/eta_loc_t%g_%d", snapshot_time, pid());
   FILE * feta = fopen (etaname, "w");
-  fprintf(feta, "x,z,pos,epsilon,p,p_p1,p_p2,dudy1,dudy2,dvdx1,dvdx2,dudx1,dudx2,dvdy1,dvdy2\n");
+  fprintf(feta, "x,z,pos,epsilon,p,dudy,dvdx,dudx,dvdy\n");
   // printing out quantities: p_p1 for p at plus 1, p_m1 for p at minus 1 etc.
   double stp = L0/256.;
   foreach(){
@@ -199,32 +200,38 @@ void output_twophase_locate () {
       if (point.level == 10) {
 	coord n = mycs (point, f);
 	double norm_2 = sqrt(sq(n.x) + sq(n.y));
-	fprintf (stderr, "Interface cell x = %g, y = %g, Delta = %g, ux = %g \n", x, y, Delta, u.x[]);
+	//fprintf (stderr, "Interface cell x = %g, y = %g, Delta = %g, ux = %g \n", x, y, Delta, u.x[]);
+	//fflush (stderr);
+	double eta = pos[];
 	double yp = y + stp;
 	point = locate (x, yp, z);
 	// Getting the local normal vector
 	// n is norm 1 and has to be normalized to norm 2
 	// double dudx = (u.x[1]     - u.x[-1]    )/(2.*Delta);
-	POINT_VARIABLES;
-	fprintf (stderr, "Above cell x = %g, y = %g \n", x, y);
-	fprintf (stderr, "Above cell DElta = %g \n", Delta);
-	fprintf (stderr, "Above cell ux = %g \n", u.x[]);
-	double dudy1 = (u.x[0,1] - u.x[0,-1])/(2.*Delta);
-	double dudy2 = (u.x[0,2] - u.x[0,0])/(2.*Delta);
-	// double dudz = (u.x[0,0,1] - u.x[0,0,-1])/(2.*Delta);
-	double dvdx1 = (u.y[0,1] - u.y[0,-1])/(2.*Delta);
-	double dvdx2 = (u.y[1,1] - u.y[1,-1])/(2.*Delta);
-	double dudx1 = (u.x[0,1] - u.x[0,-1])/(2.*Delta);
-	double dudx2 = (u.x[1,1] - u.x[1,-1])/(2.*Delta);
-	double dvdy1 = (u.y[0,1] - u.y[0,-1])/(2.*Delta);
-	double dvdy2 = (u.y[0,2] - u.y[0,0])/(2.*Delta);
-	/*  tau.x[] = 2*mu2*(SDeform.x.x[]*n.x + SDeform.y.x[]*n.y)/norm_2; */
-	/*  tau.y[] = 2*mu2*(SDeform.x.y[]*n.x + SDeform.y.y[]*n.y)/norm_2;  */
-	/* double tau1 = 2*mu2*(dudy1 + dvdx); */
-	/* double tau2 = 2*mu2*(dudy2 + dvdx); */
-	fprintf (feta, "%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
-		 x, z, pos[], -n.x/n.y, p[0,0], p[0,1], p[0,2], dudy1, dudy2, dvdx1, dvdx2, dudx1, dudx2, dvdy1, dvdy2);
+	// fprintf (stderr, "Inline 1! \n");
+	if (point.level > 0) {
+	  POINT_VARIABLES;
+	  /* fprintf (stderr, "Inline 2! \n"); */
+	  /* fprintf (stderr, "Above cell x = %g, y = %g \n", x, y); */
+	  /* fprintf (stderr, "Above cell Delta = %g \n", Delta); */
+	  /* fprintf (stderr, "Above cell ux = %g \n", u.x[]); */
+	  double dudy1 = (u.x[0,1] - u.x[0,-1])/(2.*Delta);
+	  //double dudy2 = (u.x[0,2] - u.x[0,0])/(2.*Delta);
+	  // double dudz = (u.x[0,0,1] - u.x[0,0,-1])/(2.*Delta);
+	  double dvdx1 = (u.y[0,1] - u.y[0,-1])/(2.*Delta);
+	  //double dvdx2 = (u.y[1,1] - u.y[1,-1])/(2.*Delta);
+	  double dudx1 = (u.x[0,1] - u.x[0,-1])/(2.*Delta);
+	  //double dudx2 = (u.x[1,1] - u.x[1,-1])/(2.*Delta);
+	  double dvdy1 = (u.y[0,1] - u.y[0,-1])/(2.*Delta);
+	  //double dvdy2 = (u.y[0,2] - u.y[0,0])/(2.*Delta);
+	  /*  tau.x[] = 2*mu2*(SDeform.x.x[]*n.x + SDeform.y.x[]*n.y)/norm_2; */
+	  /*  tau.y[] = 2*mu2*(SDeform.x.y[]*n.x + SDeform.y.y[]*n.y)/norm_2;  */
+	  /* double tau1 = 2*mu2*(dudy1 + dvdx); */
+	  /* double tau2 = 2*mu2*(dudy2 + dvdx); */
+	  fprintf (feta, "%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
+		   x, z, eta, -n.x/n.y, p[0,0], dudy1, dvdx1, dudx1, dvdy1);
 	/* tau.x[], tau.y[], u.x[], u.y[], n.x/norm_2, n.y/norm_2); */
+	}
       }
     }
   }
@@ -232,50 +239,7 @@ void output_twophase_locate () {
   fclose (feta);
 }
 
-void output_twophase_fraction () {
-  vertex scalar phi[];
-  scalar s[];
-  double stp = L0/256.; // Step size
-  distance_to_surface (f, phi = phi);
-  fractions (phi, s, val = stp);
-  scalar pos[];
-  coord G = {0.,1.,0.}, Z = {0.,0.,0.};
-  position (s, pos, G, Z);
-  char etaname[100];
-  sprintf (etaname, "./eta/eta_frac_t%g_%d", snapshot_time, pid());
-  FILE * feta = fopen (etaname, "w");
-  fprintf(feta, "x,z,pos,epsilon,p,p_p1,p_p2,dudy1,dudy2,dvdx1,dvdx2,dudx1,dudx2,dvdy1,dvdy2\n");
-  // printing out quantities: p_p1 for p at plus 1, p_m1 for p at minus 1 etc.
-  foreach(){
-    if (interfacial (point, s)){
-      if (point.level == 10) {
-	// Getting the local normal vector
-	coord n = mycs (point, f);
-	double norm_2 = sqrt(sq(n.x) + sq(n.y));
-	// n is norm 1 and has to be normalized to norm 2
-	// double dudx = (u.x[1]     - u.x[-1]    )/(2.*Delta);
-	double dudy1 = (u.x[0,1] - u.x[0,-1])/(2.*Delta);
-	double dudy2 = (u.x[0,2] - u.x[0,0])/(2.*Delta);
-	// double dudz = (u.x[0,0,1] - u.x[0,0,-1])/(2.*Delta);
-	double dvdx1 = (u.y[0,1] - u.y[0,-1])/(2.*Delta);
-	double dvdx2 = (u.y[1,1] - u.y[1,-1])/(2.*Delta);
-	double dudx1 = (u.x[0,1] - u.x[0,-1])/(2.*Delta);
-	double dudx2 = (u.x[1,1] - u.x[1,-1])/(2.*Delta);
-	double dvdy1 = (u.y[0,1] - u.y[0,-1])/(2.*Delta);
-	double dvdy2 = (u.y[0,2] - u.y[0,0])/(2.*Delta);
-	/*  tau.x[] = 2*mu2*(SDeform.x.x[]*n.x + SDeform.y.x[]*n.y)/norm_2; */
-	/*  tau.y[] = 2*mu2*(SDeform.x.y[]*n.x + SDeform.y.y[]*n.y)/norm_2;  */
-	/* double tau1 = 2*mu2*(dudy1 + dvdx); */
-	/* double tau2 = 2*mu2*(dudy2 + dvdx); */
-	fprintf (feta, "%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n", 
-		 x, z, pos[], -n.x/n.y, p[0,0], p[0,1], p[0,2], dudy1, dudy2, dvdx1, dvdx2, dudx1, dudx2, dvdy1, dvdy2);
-	/* tau.x[], tau.y[], u.x[], u.y[], n.x/norm_2, n.y/norm_2); */
-      }
-    }
-  }
-  fflush (feta);
-  fclose (feta);
-}
+
 
 int main(int argc, char *argv[]) {
   if (argc > 1)
@@ -322,6 +286,7 @@ int main(int argc, char *argv[]) {
   // Ustar = c_*UstarRATIO; // Depleted
   Ustar = 0.25; // Pick a fixed value
   mu2 = Ustar*rho2*(L0-h_)/RE_tau;
+  TOLERANCE=1e-5;
   // mu1 = (2.*pi/k_)*c_*rho1/RE; // Depleted: using wavelength as length scale
   mu1 = mu2/(MURATIO)/alter_MU;
   RE = rho1*c_*(2*pi/k_)/mu1; // RE now becomes a dependent Non-dim number on c 
@@ -347,35 +312,11 @@ event init (i=0) {
     fprintf(ferr, "Not restored!\n");
     return 1;
   }
-  output_slice();
+  // output_slice();
   phony = 0;
   fprintf (stderr, "Output from dump done! \n");
 }
 
-double WaveProfile (double x, double y)
-{
-  double a_ = ak/k_;
-  double eta1 = a_*cos(k_*x);
-  double alpa = 1./tanh(k_*h_);
-  double eta2 = 1./4.*alpa*(3.*sq(alpa) - 1.)*sq(a_)*k_*cos(2.*k_*x);
-  double eta3 = -3./8.*(cube(alpa)*alpa - 
-			3.*sq(alpa) + 3.)*cube(a_)*sq(k_)*cos(k_*x) + 
-    3./64.*(8.*cube(alpa)*cube(alpa) + 
-	    (sq(alpa) - 1.)*(sq(alpa) - 1.))*cube(a_)*sq(k_)*cos(3.*k_*x);
-  return eta1 + eta2 + eta3 + h_;
-}
-
-/**
-  Set the wave velocity 0. */
-event set_wave(i=0; i++; t<RELEASETIME) {
-  fraction (f, WaveProfile(x,z)-y);
-  foreach(){
-    u.x[] = (1.0 - f[])*u.x[];
-    u.y[] = (1.0 - f[])*u.y[];
-    u.z[] = (1.0 - f[])*u.z[];
-  }
-  boundary ((scalar *){u});
-}
 
 event acceleration (i++) {
   double ampl = sq(Ustar)/(L0-h_);
@@ -385,50 +326,20 @@ event acceleration (i++) {
 
 event pair_out (i++){
   if (i == j+5) {
-    fprintf (stderr, "i = %d, start figure! \n", i);
-    foreach () {
-      pair[] = p[]*(1.-f[]);
-    }
-    foreach () {
-      uwater.x[] = u.x[]*f[];
-    }
-    view (ty = -0.5);
-    squares ("uwater.x", n = {0,0,1}, alpha = 0.1);
-    {
-      static FILE * fp = POPEN ("uwater", "a");
-      save (fp = fp);
-    }
-    squares ("p", n = {0,0,1}, alpha = -0.1);
-    {
-      static FILE * fp = POPEN ("p", "a");
-      save (fp = fp);
-    }
-    squares ("pair", n = {0,0,1}, alpha = -0.1);
-    {
-      static FILE * fp = POPEN ("pair", "a");
-      save (fp = fp);
-    }
-    clear ();
-    view (ty = -0.2, fov = 8);
-    cells (n = {0,0,1}, alpha = -0.1);
-    squares ("level", n = {0,0,1}, alpha = -0.1, max = 10, min = 5);
-    {
-      static FILE * fp = POPEN ("level", "a");
-      save (fp = fp);
-    }
-    fprintf (stderr, "i = %d, end figure! \n", i);
-    char filename[100];
-    int Nslice = 256;
-    double L0 = 2*pi;
-    double zslice = -L0/2+L0/2./Nslice;
-    for (int i=0; i<Nslice; i++) {
-      zslice += L0/Nslice;
-      sprintf (filename, "./field/p_run_t%g_slice%d", snapshot_time, i);
-      sliceXY (filename,p,zslice,OUTLEVEL);
-      sprintf (filename, "./field/pair_run_t%g_slice%d", snapshot_time, i);
-      sliceXY (filename,pair,zslice,OUTLEVEL);
-    }
-    output_twophase_locate();
+    /* char filename[100]; */
+    /* int Nslice = 256; */
+    /* double L0 = 2*pi; */
+    /* double zslice = -L0/2+L0/2./Nslice; */
+    /* for (int i=0; i<Nslice; i++) { */
+    /*   zslice += L0/Nslice; */
+    /*   sprintf (filename, "./field/p_run_t%g_slice%d", snapshot_time, i); */
+    /*   sliceXY (filename,p,zslice,OUTLEVEL); */
+    /*   sprintf (filename, "./field/pair_run_t%g_slice%d", snapshot_time, i); */
+    /*   sliceXY (filename,pair,zslice,OUTLEVEL); */
+    /* } */
+    /* output_twophase(); */
+    /* output_twophase_fraction (); */
+    output_twophase_locate(snapshot_time);
     return 1;
   }
 }

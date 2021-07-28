@@ -278,7 +278,7 @@ event movies (t += 0.1) {
 
 /**
    Generate averaged profile in y direction on the fly. */
-event profile_output (t += 1) {
+event profile_output (t += 0.5) {
   char file[99];
   sprintf (file, "prof_%g", t);
   scalar uxuy[],uxux[],uyuy[],uzuz[];
@@ -333,19 +333,6 @@ void sliceXY(char * fname,scalar s,double zp, int maxlevel){
   matrix_free (field);
 }
 
-event output_slice (t += 0.05)
-{
-  char filename[100];
-  double zslice = 0.;
-  sprintf (filename, "./field/ux_t%g_center", t);
-  sliceXY (filename,u.x,zslice,MAXLEVEL-1);
-  sprintf (filename, "./field/uy_t%g_center", t);
-  sliceXY (filename,u.y,zslice,MAXLEVEL-1);
-  sprintf (filename, "./field/uz_t%g_center", t);
-  sliceXY (filename,u.z,zslice,MAXLEVEL-1);
-  sprintf (filename, "./field/f_t%g_center", t);
-  sliceXY (filename,f,zslice,MAXLEVEL-1);
-}
 
 /**
    Output eta on the fly. */
@@ -368,9 +355,95 @@ void output_twophase (double snapshot_time) {
   fclose (feta);
 } 
 
+void output_twophase_locate (double snapshot_time) {
+  scalar pos[];
+  coord G = {0.,1.,0.}, Z = {0.,0.,0.};
+  position (f, pos, G, Z);
+  char etaname[100];
+  sprintf (etaname, "./eta/eta_loc_t%g_%d", snapshot_time, pid());
+  FILE * feta = fopen (etaname, "w");
+  fprintf(feta, "x,z,pos,epsilon,p,dudy,dvdx,dudx,dvdy\n");
+  // printing out quantities: p_p1 for p at plus 1, p_m1 for p at minus 1 etc.
+  double stp = L0/256.;
+  foreach(){
+    if (interfacial (point, f)){
+      if (point.level == 10) {
+	coord n = mycs (point, f);
+	double norm_2 = sqrt(sq(n.x) + sq(n.y));
+	//fprintf (stderr, "Interface cell x = %g, y = %g, Delta = %g, ux = %g \n", x, y, Delta, u.x[]);
+	//fflush (stderr);
+	double eta = pos[];
+	double yp = y + stp;
+	point = locate (x, yp, z);
+	// Getting the local normal vector
+	// n is norm 1 and has to be normalized to norm 2
+	// double dudx = (u.x[1]     - u.x[-1]    )/(2.*Delta);
+	// fprintf (stderr, "Inline 1! \n");
+	if (point.level > 0) {
+	  POINT_VARIABLES;
+	  /* fprintf (stderr, "Inline 2! \n"); */
+	  /* fprintf (stderr, "Above cell x = %g, y = %g \n", x, y); */
+	  /* fprintf (stderr, "Above cell Delta = %g \n", Delta); */
+	  /* fprintf (stderr, "Above cell ux = %g \n", u.x[]); */
+	  double dudy1 = (u.x[0,1] - u.x[0,-1])/(2.*Delta);
+	  //double dudy2 = (u.x[0,2] - u.x[0,0])/(2.*Delta);
+	  // double dudz = (u.x[0,0,1] - u.x[0,0,-1])/(2.*Delta);
+	  double dvdx1 = (u.y[0,1] - u.y[0,-1])/(2.*Delta);
+	  //double dvdx2 = (u.y[1,1] - u.y[1,-1])/(2.*Delta);
+	  double dudx1 = (u.x[0,1] - u.x[0,-1])/(2.*Delta);
+	  //double dudx2 = (u.x[1,1] - u.x[1,-1])/(2.*Delta);
+	  double dvdy1 = (u.y[0,1] - u.y[0,-1])/(2.*Delta);
+	  //double dvdy2 = (u.y[0,2] - u.y[0,0])/(2.*Delta);
+	  /*  tau.x[] = 2*mu2*(SDeform.x.x[]*n.x + SDeform.y.x[]*n.y)/norm_2; */
+	  /*  tau.y[] = 2*mu2*(SDeform.x.y[]*n.x + SDeform.y.y[]*n.y)/norm_2;  */
+	  /* double tau1 = 2*mu2*(dudy1 + dvdx); */
+	  /* double tau2 = 2*mu2*(dudy2 + dvdx); */
+	  fprintf (feta, "%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
+		   x, z, eta, -n.x/n.y, p[0,0], dudy1, dvdx1, dudx1, dvdy1);
+	/* tau.x[], tau.y[], u.x[], u.y[], n.x/norm_2, n.y/norm_2); */
+	}
+      }
+    }
+  }
+  fflush (feta);
+  fclose (feta);
+}
+
+
 event eta_output (t += 0.1) {
   if (t > RELEASETIME) // Event does not take variable time condition 
-    output_twophase (t);
+    output_twophase_locate (t);
+}
+
+
+/* event output_slice (t += 0.05) */
+/* { */
+/*   char filename[100]; */
+/*   double zslice = 0.; */
+/*   sprintf (filename, "./field/ux_t%g_center", t); */
+/*   sliceXY (filename,u.x,zslice,MAXLEVEL-1); */
+/*   sprintf (filename, "./field/uy_t%g_center", t); */
+/*   sliceXY (filename,u.y,zslice,MAXLEVEL-1); */
+/*   sprintf (filename, "./field/uz_t%g_center", t); */
+/*   sliceXY (filename,u.z,zslice,MAXLEVEL-1); */
+/*   sprintf (filename, "./field/f_t%g_center", t); */
+/*   sliceXY (filename,f,zslice,MAXLEVEL-1); */
+/* } */
+
+event turbulence_stat (t += 0.5) {
+  char filename[100];
+  int Nslice = 256;
+  double L0 = 2*pi;
+  double zslice = -L0/2+L0/2./Nslice;
+  for (int i=0; i<Nslice; i++) {
+    zslice += L0/Nslice;
+    sprintf (filename, "./field/ux_t%g_slice%d", t, i);
+    sliceXY (filename,u.x,zslice,9);
+    sprintf (filename, "./field/uy_t%g_slice%d", t, i);
+    sliceXY (filename,u.y,zslice,9);
+    sprintf (filename, "./field/f_t%g_slice%d", t, i);
+    sliceXY (filename,f,zslice,9);
+  }
 }
 
 /**
