@@ -6,7 +6,7 @@
 #include "reduced.h"  //reduced gravity
 #include "view.h"
 #include "lambda2.h"
-
+#include "save_data.h"
 
 double snapshot_time = 0;
 int OUTLEVEL=7;
@@ -241,6 +241,8 @@ event init(i=0)
     fprintf(ferr, "Not restored!\n");
     return 1;
   }
-  output_twophase_locate();
-  output_slice();
+  output_twophase_locate ();
+  output_slice ();
+  char name[80];
+  save_data ((scalar*){f,p}, (vector*){u}, i, t, "pvta");
 }

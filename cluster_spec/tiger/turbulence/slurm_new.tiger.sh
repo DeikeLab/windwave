@@ -2,7 +2,7 @@
 #SBATCH --nodes=4
 #SBATCH --ntasks=160
 #SBATCH --cpus-per-task=1
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
 #SBATCH --mail-user=jiarongw@princeton.edu
@@ -13,11 +13,11 @@ EXE=curved_fixREtau_boundary
 LEVEL=10
 RE_tau=720 
 BO=200
-g=1
+g=64
 ak=0.2
 TIME=57
 emaxRATIO=0.3
-alterMU=16
+alterMU=1
 
 export ScratchDir="/scratch/gpfs/jiarongw/turbulence/${EXE}_REtau${RE_tau}_BO${BO}_g${g}_ak${ak}_MU${alterMU}_LEVEL${LEVEL}_emax${emaxRATIO}"
 echo $ScratchDir

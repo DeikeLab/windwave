@@ -1,0 +1,4 @@
+curved_fixedREtau_boundary: the main simulation source code.
+curved_fixedREtau_precursor: the file used to generate precursor (obsolete), lacks a few output function (slices and eta_loc).
+diagnosis.c: output water velocity to eta_supplement (which was not written in the curved_fixedREtau_boundary). Should consider merging it directly to curved_fixedREtau_boundary. Also output slices (redundant if it was already output by simulation on the fly). Update: also output vtk files for paraview now.
+diagnosis_run_interface.c: used to output eta_loc, mainly pressure (a few timesteps after restoration). Only used if the code did not output eta_loc files on the fly.  
