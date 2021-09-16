@@ -454,6 +454,16 @@ event end (t = 1000.) {
   dump ("end");
 }
 
+event dumpforrestart (t += 0.1) {
+  char dname[100];
+  u_water.x.nodump = true;
+  u_water.y.nodump = true;
+  u_water.z.nodump = true;
+  // p.nodump = false;
+  sprintf (dname, "restart");
+  dump (dname);
+}
+
 event dumpstep (t += 1) {
   char dname[100];
   u_water.x.nodump = true;

@@ -244,5 +244,6 @@ event init(i=0)
   output_twophase_locate ();
   output_slice ();
   char name[80];
-  save_data ((scalar*){f,p}, (vector*){u}, i, t, "pvta");
+  save_data ((scalar*){f,p}, (vector*){u}, (int)snapshot_time, t, "pvta");
+  return 0;
 }
