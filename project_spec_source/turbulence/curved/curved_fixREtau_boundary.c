@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
   // mu1 = (2.*pi/k_)*c_*rho1/RE; // Depleted: using wavelength as length scale
   mu1 = mu2/(MURATIO)/alter_MU;
   RE = rho1*c_*(2*pi/k_)/mu1; // RE now becomes a dependent Non-dim number on c 
-  fprintf (stderr, "g = %g, c = %g, Ustar = %g, MURATIO = %g, mu_w = %g, rho_w = %g, mu_a = %g, rho_a = %g, sigma = %g, Bo = %g, RE = %g, Re_tau = %g\n", g_, c_, Ustar, MURATIO, mu1, rho1, mu2, rho2, f.sigma, BO, RE, RE_tau);
+  fprintf (stderr, "g = %g, c = %g, Ustar = %g, MURATIO = %g, mu_w = %g, rho_w = %g, mu_a = %g, rho_a = %g, sigma = %g, Bo = %g, RE = %g, Re_tau = %g\n", g_, c_, Ustar, MURATIO*alter_MU, mu1, rho1, mu2, rho2, f.sigma, BO, RE, RE_tau);
   // Give the address of av to a so that acceleration can be changed
   a = av;
   init_grid (1 << 7);
