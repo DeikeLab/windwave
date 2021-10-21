@@ -326,20 +326,23 @@ event acceleration (i++) {
 
 event pair_out (i++){
   if (i == j+5) {
-    /* char filename[100]; */
-    /* int Nslice = 256; */
-    /* double L0 = 2*pi; */
-    /* double zslice = -L0/2+L0/2./Nslice; */
-    /* for (int i=0; i<Nslice; i++) { */
-    /*   zslice += L0/Nslice; */
-    /*   sprintf (filename, "./field/p_run_t%g_slice%d", snapshot_time, i); */
-    /*   sliceXY (filename,p,zslice,OUTLEVEL); */
-    /*   sprintf (filename, "./field/pair_run_t%g_slice%d", snapshot_time, i); */
-    /*   sliceXY (filename,pair,zslice,OUTLEVEL); */
-    /* } */
-    /* output_twophase(); */
-    /* output_twophase_fraction (); */
-    output_twophase_locate(snapshot_time);
+    char filename[100];
+    int Nslice = 256;
+    double L0 = 2*pi;
+    double zslice = -L0/2+L0/2./Nslice;
+    foreach () {
+      pair[] = p[]*(1-f[]);
+    }
+    for (int i=0; i<Nslice; i++) {
+      zslice += L0/Nslice;
+      /* sprintf (filename, "./field/p_run_t%g_slice%d", snapshot_time, i); */
+      /* sliceXY (filename,p,zslice,OUTLEVEL); */
+      sprintf (filename, "./field/pair_run_t%g_slice%d", snapshot_time, i);
+      sliceXY (filename,pair,zslice,OUTLEVEL);
+    }
+    //output_twophase();
+    //output_twophase_fraction ();
+    //output_twophase_locate(snapshot_time);
     return 1;
   }
 }

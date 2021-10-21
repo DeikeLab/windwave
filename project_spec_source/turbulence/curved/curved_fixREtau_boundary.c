@@ -32,6 +32,7 @@ double Ustar;
 
 double uemax = 0.01;
 double femax = 0.0001;
+double uwemax = 0.001;
 double uemaxRATIO = 0.01;
 
 #define RATIO 1.225/1000. //density ratio, air to water
@@ -97,6 +98,7 @@ int main(int argc, char *argv[]) {
   init_grid (1 << 7);
   // Refine according to 
   uemax = uemaxRATIO*Ustar;
+  uwemax = 0.001*c_;
   fprintf (stderr, "RELEASETIME = %g, uemax = %g \n", RELEASETIME, uemax);
   run();
 }
@@ -429,7 +431,7 @@ event eta_output (t += 0.1) {
 /*   sprintf (filename, "./field/f_t%g_center", t); */
 /*   sliceXY (filename,f,zslice,MAXLEVEL-1); */
 /* } */
-
+scalar pair[];
 event turbulence_stat (t += 0.5) {
   char filename[100];
   int Nslice = 256;
@@ -446,6 +448,20 @@ event turbulence_stat (t += 0.5) {
   }
 }
 
+event p_stat (t += 0.2) {
+  char filename[100];
+  int Nslice = 256;
+  double L0 = 2*pi;
+  double zslice = -L0/2+L0/2./Nslice;
+  foreach () {
+    pair[] = p[]*(1-f[]);
+  }
+  for (int i=0; i<Nslice; i++) {
+    zslice += L0/Nslice;
+    sprintf (filename, "./field/pair_run_t%g_slice%d", t, i);
+    sliceXY (filename,pair,zslice,9);
+  }  
+}
 /**
    ## End or dump regularly. */
 
@@ -469,6 +485,7 @@ event dumpstep (t += 1) {
   u_water.x.nodump = true;
   u_water.y.nodump = true;
   u_water.z.nodump = true;
+  pair.nodump = true;
   // p.nodump = false;
   sprintf (dname, "dump%g", t);
   dump (dname);
@@ -487,7 +504,7 @@ event adapt (i++) {
       foreach_dimension ()
 	u_water.x[] = u.x[]*f[];
     }
-    adapt_wavelet ({f,u,u_water}, (double[]){femax,uemax,uemax,uemax,0.001,0.001,0.001}, MAXLEVEL);
+    adapt_wavelet ({f,u,u_water}, (double[]){femax,uemax,uemax,uemax,uwemax,uwemax,uwemax}, MAXLEVEL);
   }
 }
 #endif
