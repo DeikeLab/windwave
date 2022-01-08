@@ -369,7 +369,7 @@ void output_twophase_locate (double snapshot_time) {
   double stp = L0/256.;
   foreach(){
     if (interfacial (point, f)){
-      if (point.level == 10) {
+      if (point.level == MAXLEVEL) {
 	coord n = mycs (point, f);
 	double norm_2 = sqrt(sq(n.x) + sq(n.y));
 	//fprintf (stderr, "Interface cell x = %g, y = %g, Delta = %g, ux = %g \n", x, y, Delta, u.x[]);
