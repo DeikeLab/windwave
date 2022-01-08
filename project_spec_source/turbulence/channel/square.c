@@ -9,9 +9,19 @@ face vector av[];
 double amp_force = 0.1;
 double Ustar = 0.1;
 double delta = 1.;
+int MAXLEVEL = dimension == 2 ? 10 : 5; // max level if not use limited refinement
+double RE_tau = 180.;
+double uemax = 0.01;
+double uemaxRATIO = 0.1;
 
-int main() {
+int main(int argc, char *argv[]) {
   // If we want to do slender channel we still need embedded
+  if (argc > 1)
+    MAXLEVEL = atoi(argv[1]);
+  if (argc > 2)
+    RE_tau = atof(argv[2]);
+  if (argc > 3)
+    uemaxRATIO = atof(argv[3]);
   L0 = 2.;
   origin (-L0/2., -L0/2., -L0/2.);
   N = 128;
@@ -25,13 +35,14 @@ int main() {
   u.t[bottom] = dirichlet(0); 
   periodic (right);
   periodic (front);
+  uemax = uemaxRATIO*Ustar;
   run ();
 }
 
 event properties (i++)
 {
   foreach_face()
-    muv.x[] = delta*Ustar/180.;  // Use channel half height and u_tao 
+    muv.x[] = delta*Ustar/RE_tau;  // Use channel half height and u_tao 
 }
 
 //u.n[embed] = fabs(y) > 0.25 ? neumann(0.) : dirichlet(0.);
@@ -51,7 +62,7 @@ event init (t = 0) {
   /* fractions (phi,cs,fs); */
   if (!restore("restart")) {
     double rand = 0;
-    double ytau = delta/180.;
+    double ytau = delta/RE_tau;
     foreach() {
       rand = randInRange (0,0.1);
       // Initialize with a more accurate profile
@@ -89,7 +100,8 @@ event profile_output (t += 0.1) {
   foreach_vertex ()
     phi[] = y;
   // default phi is y
-  profiles ({u.x, u.y, u.z, uxuy, uxux, uyuy, uzuz}, phi, rf = 0.5,  fname = file, min = -1., max = 1.);
+  int npoint = 1<<MAXLEVEL;
+  profiles ({u.x, u.y, u.z, uxuy, uxux, uyuy, uzuz}, phi, rf = 0.5, fname = file, n = npoint, min = -1., max = 1.);
 }
 
 #  define POPEN(name, mode) fopen (name ".ppm", mode)
@@ -121,14 +133,118 @@ event movies (t += 0.1) {
 }
 
 event adapt (i++) {
-    adapt_wavelet ({u}, (double[]){3e-2,3e-2,3e-2}, 10, 5);
+    adapt_wavelet ({u}, (double[]){uemax,uemax,uemax}, MAXLEVEL, 5);
 }
 
-event dumpstep (t += 0.1) {
+void sliceXZ(char * fname,scalar s,double yp, int maxlevel){
+  FILE *fpver =fopen (fname,"w"); 
+  int nn = (1<<maxlevel);
+  double ** field = matrix_new (nn, nn, sizeof(double));
+  double stp = L0/(double)nn;
+  for (int i = 0; i < nn; i++)
+    {
+      double xp = stp*i + X0 + stp/2.;
+      for (int j = 0; j < nn; j++) 
+	{
+	  double zp = stp*j + Z0 + stp/2.;
+	  Point point = locate (xp, yp, zp);
+	  field[i][j] = point.level >= 0 ? s[] : nodata;
+	}
+    }
+  if (pid() == 0){ // master
+#if _MPI
+    MPI_Reduce (MPI_IN_PLACE, field[0], sq(nn), MPI_DOUBLE, MPI_MIN, 0,
+		MPI_COMM_WORLD);
+#endif
+    for (int i = 0; i < nn; i++) {
+      for (int j = 0; j < nn; j++) {
+	fprintf (fpver, "%g\t", field[i][j]);
+      }
+      fputc ('\n', fpver);
+    }
+    fflush (fpver);
+  }
+#if _MPI
+  else // slave
+    MPI_Reduce (field[0], NULL, nn*nn, MPI_DOUBLE, MPI_MIN, 0,
+		MPI_COMM_WORLD);
+#endif
+  matrix_free (field);
+}
+
+void sliceXY(char * fname,scalar s,double zp, int maxlevel){
+  FILE *fpver =fopen (fname,"w"); 
+  int nn = (1<<maxlevel);
+  double ** field = matrix_new (nn, nn, sizeof(double));
+  double stp = L0/(double)nn;
+  for (int i = 0; i < nn; i++)
+    {
+      double xp = stp*i + X0 + stp/2.;
+      for (int j = 0; j < nn; j++) 
+	{
+	  double yp = stp*j + Y0 + stp/2.;
+	  Point point = locate (xp, yp, zp);
+	  field[i][j] = point.level >= 0 ? s[] : nodata;
+	}
+    }
+  if (pid() == 0){ // master
+#if _MPI
+    MPI_Reduce (MPI_IN_PLACE, field[0], sq(nn), MPI_DOUBLE, MPI_MIN, 0,
+		MPI_COMM_WORLD);
+#endif
+    for (int i = 0; i < nn; i++) {
+      for (int j = 0; j < nn; j++) {
+	fprintf (fpver, "%g\t", field[i][j]);
+      }
+      fputc ('\n', fpver);
+    }
+    fflush (fpver);
+  }
+#if _MPI
+  else // slave
+    MPI_Reduce (field[0], NULL, nn*nn, MPI_DOUBLE, MPI_MIN, 0,
+		MPI_COMM_WORLD);
+#endif
+  matrix_free (field);
+}
+
+void output_slice ()
+{
+  char filename[100];
+  int Nslice = 1<<MAXLEVEL;
+  /* double zslice = -L0/2; */
+  /* double L0 = 2*pi; */
+  /* for (int i=0; i<Nslice; i++) { */
+  /*   zslice += L0/Nslice; */
+  /*   sprintf (filename, "./field/ux_t%g_slice%d", snapshot_time, i); */
+  /*   sliceXY (filename,u.x,zslice,MAXLEVEL); */
+  /*   sprintf (filename, "./field/uy_t%g_slice%d", snapshot_time, i); */
+  /*   sliceXY (filename,u.y,zslice,MAXLEVEL); */
+  /*   sprintf (filename, "./field/f_t%g_slice%d", snapshot_time, i); */
+  /*   sliceXY (filename,f,zslice,MAXLEVEL); */
+  /* } */ 
+  double yslice = -L0/2. + L0/2./Nslice;
+  for (int i=0; i<Nslice; i++) {
+    sprintf (filename, "./field/ux_t%g_slice%d", t, i);
+    sliceXZ (filename,u.x,yslice,MAXLEVEL);
+    sprintf (filename, "./field/uy_t%g_slice%d", t, i);
+    sliceXZ (filename,u.y,yslice,MAXLEVEL);
+    sprintf (filename, "./field/uz_t%g_slice%d", t, i);
+    sliceXZ (filename,u.z,yslice,MAXLEVEL);
+    yslice += L0/Nslice;
+  }  
+}
+
+event dumpstep (t += 1) {
   char dname[100];
   p.nodump = false;
   sprintf (dname, "dump%g", t);
   dump (dname);
+}
+
+event dump_restart (t += 0.5) {
+  dump ("restart");
+  //output_slice ();
 }
 
 event end (t = 1000.) {
