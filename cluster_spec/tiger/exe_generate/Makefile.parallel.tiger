@@ -11,7 +11,7 @@ MPICCFLAGS += -Wall -std=c99 -O2 -D_MPI=1 -DTRACE=2 -DDEBUG=1
 BAS=qcc
 MPICC = mpicc
 #LDFLAGS = -lm -ldl
-LDFLAGS = -lgfortran -L${BASILISK}/ppr -lppr -lm 
+LDFLAGS = -lgfortran -L${BASILISK}/ppr -lppr -lm -ldl
 OPENGLINC = ${BASILISK}
 OPENGLIBS = -L${BASILISK}/gl -lglutils -lfb_osmesa -lGLU -lOSMesa
 

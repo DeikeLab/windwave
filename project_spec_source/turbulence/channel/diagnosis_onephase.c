@@ -6,6 +6,8 @@
 #include "reduced.h"  //reduced gravity
 #include "view.h"
 #include "lambda2.h"
+#include "./sandbox/profile6.h"
+
 
 #define POPEN(name, mode) fopen (name ".ppm", mode)
 double snapshot_time = 0;
@@ -84,7 +86,7 @@ void sliceXY(char * fname,scalar s,double zp, int maxlevel){
   matrix_free (field);
 }
 
-void output_slice ()
+void output_slice (double snapshot_time)
 {
   char filename[100];
   int Nslice = 256;
@@ -99,23 +101,35 @@ void output_slice ()
   /*   sprintf (filename, "./field/f_t%g_slice%d", snapshot_time, i); */
   /*   sliceXY (filename,f,zslice,MAXLEVEL); */
   /* } */ 
-  double L0 = 4*pi;
-  double yslice = 2*pi/Nslice;
-  for (int i=0; i<25; i++) {
+  double yslice = -L0 + L0/2./Nslice;
+  for (int i=0; i<Nslice; i++) {
+    if (yslice < 1. && yslice > -1.) {
+      sprintf (filename, "./field/ux_t%g_slice%d", snapshot_time, i);
+      sliceXZ (filename,u.x,yslice,MAXLEVEL);
+      sprintf (filename, "./field/uy_t%g_slice%d", snapshot_time, i);
+      sliceXZ (filename,u.y,yslice,MAXLEVEL);
+      sprintf (filename, "./field/uz_t%g_slice%d", snapshot_time, i);
+      sliceXZ (filename,u.z,yslice,MAXLEVEL);
+    }
     yslice += L0/Nslice;
-    sprintf (filename, "./field/ux_t%g_slice%d", snapshot_time, i);
-    sliceXZ (filename,u.x,yslice,MAXLEVEL);
-    sprintf (filename, "./field/uy_t%g_slice%d", snapshot_time, i);
-    sliceXZ (filename,u.y,yslice,MAXLEVEL);
-    sprintf (filename, "./field/uz_t%g_slice%d", snapshot_time, i);
-    sliceXZ (filename,u.z,yslice,MAXLEVEL);
-    sprintf (filename, "./field/ux_t%g_slice%d", snapshot_time, -i);
-    sliceXZ (filename,u.x,-yslice,MAXLEVEL);
-    sprintf (filename, "./field/uy_t%g_slice%d", snapshot_time, -i);
-    sliceXZ (filename,u.y,-yslice,MAXLEVEL);
-    sprintf (filename, "./field/uz_t%g_slice%d", snapshot_time, -i);
-    sliceXZ (filename,u.z,-yslice,MAXLEVEL);
   }  
+}
+
+void profile_output (double snapshot_time) {
+  char file[99];
+  sprintf (file, "profpost_%g", snapshot_time);
+  scalar uxuy[],uxux[],uyuy[],uzuz[];
+  foreach () {
+    uxuy[] = u.x[]*u.y[];
+    uxux[] = u.x[]*u.x[];
+    uyuy[] = u.y[]*u.y[];
+    uzuz[] = u.z[]*u.z[];
+  }
+  vertex scalar phi[];
+  foreach_vertex ()
+    phi[] = y;
+  // default phi is y
+  profiles ({u.x, u.y, u.z, uxuy, uxux, uyuy, uzuz}, phi, rf = 0.5,  fname = file, min = -1., max = 1.);
 }
 
 int main (int argc, char * argv[] )
@@ -130,12 +144,13 @@ int main (int argc, char * argv[] )
     fprintf(ferr, "Not restored!\n");
     return 1;
   }
-  L0 = 4.*pi;
+  L0 = 2.;
   /* X0 = 0.; */
   /* Z0 = 0.; */
   /* Y0 = -2.*pi; */
   restore (targetname);
-  output_slice();
+  output_slice(snapshot_time);
+  profile_output(snapshot_time);
   run();
 }
 

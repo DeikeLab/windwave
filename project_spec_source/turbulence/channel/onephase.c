@@ -10,12 +10,19 @@ face vector av[];
 double amp_force = 0.1;
 double Ustar = 0.1;
 double delta = 1.;
+int MAXLEVEL = dimension == 2 ? 10 : 5; // max level if not use limited refinement
+double RE_tau = 180.;
+int phony = 10000;
 
-int main() {
+int main(int argc, char *argv[]) {
   // If we want to do slender channel we still need embedded
+  if (argc > 1)
+    MAXLEVEL = atoi(argv[1]);
+  if (argc > 2)
+    RE_tau = atof(argv[2]);
   L0 = 4*pi;
   origin (0, -L0/2., 0);
-  N = 128;
+  N = 1 << (MAXLEVEL-2);
   mu = muv;
   a = av;
   /* u.r[top] = dirichlet(0); */
@@ -48,6 +55,8 @@ double randInRange(int min, int max)
 
 event init (t = 0) {
   if (!restore("restart")) {
+    // restore from level 9 
+    phony = 0;
     vertex scalar phi[];
     foreach_vertex() {
       phi[] = intersection (delta-y, delta+y);  // Slender channel using embedded
@@ -68,6 +77,7 @@ event init (t = 0) {
     boundary((scalar *){u});
   }
   else {
+    phony = 0;
     for (scalar s in {u, g})
       s.prolongation = refine_injection;
     restore ("restart");
@@ -166,10 +176,11 @@ event movies (t += 1) {
 }
 
 event adapt (i++) {
-  /* if (i <= 20) */
-  /*   adapt_wavelet ({cs,u}, (double[]){1e-4,3e-2,3e-2,3e-2}, 9, 5);  */
-  /* if (i > 20) */
-    adapt_wavelet ({cs,u}, (double[]){1e-4,3e-2,3e-2,3e-2}, 10, 5);
+  if (phony <= 10)
+    adapt_wavelet ({cs,u}, (double[]){1e-4,3e-2,3e-2,3e-2}, 9, 6);
+  if (phony > 10)
+    adapt_wavelet ({cs,u}, (double[]){1e-4,1e-1,1e-1,1e-1}, MAXLEVEL, MAXLEVEL-3);
+  phony += 1;
 }
 
 event dumpstep (t += 10.) {
@@ -182,6 +193,10 @@ event dumpstep (t += 10.) {
     pid[] = fmod(pid()*(npe()+37),npe());
   boundary ({pid});
   dump (dname);
+}
+
+event dump_restart (t += 1) {
+  dump ("restart");
 }
 
 event end (t = 1000.) {
