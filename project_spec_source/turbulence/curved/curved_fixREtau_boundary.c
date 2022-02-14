@@ -470,7 +470,7 @@ event end (t = 1000.) {
   dump ("end");
 }
 
-event dumpforrestart (t += 0.1) {
+event dumpforrestart (t += 1) {
   char dname[100];
   u_water.x.nodump = true;
   u_water.y.nodump = true;
