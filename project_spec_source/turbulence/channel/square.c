@@ -36,6 +36,7 @@ int main(int argc, char *argv[]) {
   periodic (right);
   periodic (front);
   uemax = uemaxRATIO*Ustar;
+  fprintf (stderr, "RE_tau = %g, MAXLEVEL = %d, uemax = %g \n", RE_tau, MAXLEVEL, uemax);
   run ();
 }
 
@@ -86,7 +87,7 @@ event acceleration (i++) {
     av.x[] += ampl;
 }
 
-event profile_output (t += 0.1) {
+event profile_output (t += 1) {
   char file[99];
   sprintf (file, "prof_%g", t);
   scalar uxuy[],uxux[],uyuy[],uzuz[];
@@ -105,7 +106,7 @@ event profile_output (t += 0.1) {
 }
 
 #  define POPEN(name, mode) fopen (name ".ppm", mode)
-event movies (t += 0.1) {
+event movies (t += 1) {
 
   /**
      Movie generation. */
@@ -208,41 +209,40 @@ void sliceXY(char * fname,scalar s,double zp, int maxlevel){
   matrix_free (field);
 }
 
-void output_slice ()
-{
-  char filename[100];
-  int Nslice = 1<<MAXLEVEL;
-  /* double zslice = -L0/2; */
-  /* double L0 = 2*pi; */
-  /* for (int i=0; i<Nslice; i++) { */
-  /*   zslice += L0/Nslice; */
-  /*   sprintf (filename, "./field/ux_t%g_slice%d", snapshot_time, i); */
-  /*   sliceXY (filename,u.x,zslice,MAXLEVEL); */
-  /*   sprintf (filename, "./field/uy_t%g_slice%d", snapshot_time, i); */
-  /*   sliceXY (filename,u.y,zslice,MAXLEVEL); */
-  /*   sprintf (filename, "./field/f_t%g_slice%d", snapshot_time, i); */
-  /*   sliceXY (filename,f,zslice,MAXLEVEL); */
-  /* } */ 
-  double yslice = -L0/2. + L0/2./Nslice;
-  for (int i=0; i<Nslice; i++) {
-    sprintf (filename, "./field/ux_t%g_slice%d", t, i);
-    sliceXZ (filename,u.x,yslice,MAXLEVEL);
-    sprintf (filename, "./field/uy_t%g_slice%d", t, i);
-    sliceXZ (filename,u.y,yslice,MAXLEVEL);
-    sprintf (filename, "./field/uz_t%g_slice%d", t, i);
-    sliceXZ (filename,u.z,yslice,MAXLEVEL);
-    yslice += L0/Nslice;
-  }  
-}
+/* event output_slice (t +=1) */
+/* { */
+/*   char filename[100]; */
+/*   int Nslice = 256; */
+/*   double zslice = -L0/2. + L0/2./Nslice;; */
+/*   for (int i=0; i<Nslice; i++) { */
+/*     sprintf (filename, "./field/ux_t%g_slice%d", t, i); */
+/*     sliceXY (filename,u.x,zslice,9); */
+/*     sprintf (filename, "./field/uy_t%g_slice%d", t, i); */
+/*     sliceXY (filename,u.y,zslice,9); */
+/*     sprintf (filename, "./field/uz_t%g_slice%d", t, i); */
+/*     sliceXY (filename,u.z,zslice,9); */
+/*     zslice += L0/Nslice; */
+/*   }  */
+/*   /\* double yslice = -L0/2. + L0/2./Nslice; *\/ */
+/*   /\* for (int i=0; i<Nslice; i++) { *\/ */
+/*   /\*   sprintf (filename, "./field/ux_t%g_slice%d", t, i); *\/ */
+/*   /\*   sliceXZ (filename,u.x,yslice,MAXLEVEL); *\/ */
+/*   /\*   sprintf (filename, "./field/uy_t%g_slice%d", t, i); *\/ */
+/*   /\*   sliceXZ (filename,u.y,yslice,MAXLEVEL); *\/ */
+/*   /\*   sprintf (filename, "./field/uz_t%g_slice%d", t, i); *\/ */
+/*   /\*   sliceXZ (filename,u.z,yslice,MAXLEVEL); *\/ */
+/*   /\*   yslice += L0/Nslice; *\/ */
+/*   /\* }   *\/ */
+/* } */
 
-event dumpstep (t += 1) {
+event dumpstep (t += 5) {
   char dname[100];
   p.nodump = false;
   sprintf (dname, "dump%g", t);
   dump (dname);
 }
 
-event dump_restart (t += 0.5) {
+event dump_restart (t += 1) {
   dump ("restart");
   //output_slice ();
 }

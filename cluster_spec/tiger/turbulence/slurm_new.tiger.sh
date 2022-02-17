@@ -21,10 +21,10 @@ alterMU=5.333
 
 export ScratchDir="/scratch/gpfs/jiarongw/turbulence/${EXE}_REtau${RE_tau}_BO${BO}_g${g}_ak${ak}_MU${alterMU}_LEVEL${LEVEL}_emax${emaxRATIO}"
 echo $ScratchDir
-#rm -rf $ScratchDir
-#mkdir -p $ScratchDir
-#cp /scratch/gpfs/jiarongw/executable/f$EXE/$EXE $ScratchDir 
-#cp /home/jiarongw/windwave/project_spec_source/turbulence/curved/${EXE}.c $ScratchDir
+rm -rf $ScratchDir
+mkdir -p $ScratchDir
+cp /scratch/gpfs/jiarongw/executable/f$EXE/$EXE $ScratchDir 
+cp /home/jiarongw/windwave/project_spec_source/turbulence/curved/${EXE}.c $ScratchDir
 cd $ScratchDir
 cp ../curved_fixREtau_precursor_REtau720_ak0.2_LEVEL10_emax0.3/dump56 ./restart
 mkdir ./field
