@@ -252,6 +252,11 @@ int main(int argc, char * argv[])
     L0 = atof(argv[6]);
   else
     L0 = 50.;
+  if (argc > 7)
+    max_slope = atof(argv[7]);
+  if (argc > 8)
+    breaking = atof(argv[8]);
+  
   origin (-L0/2., -L0/2.);
   periodic (right);
   periodic (top);
@@ -274,6 +279,7 @@ int main(int argc, char * argv[])
 #endif
   CFL_H = 1; // Smaller time step
   // max_slope = 0.8;
+  // breaking = 0.5;
   run();
 }
 
@@ -304,6 +310,7 @@ event init (i = 0)
     }
     fprintf (stderr,"Done initialization!\n");
     dump("initial");
+    fprintf (stderr, "breaking = %g, max_slope = %g\n", breaking, max_slope);
   }
 }
 
@@ -381,10 +388,11 @@ event movie (t += 0.1; t <= TEND)
   static FILE * fp = POPEN ("slope", "a");
   save (fp = fp);
   }
-  char filename1[50], filename2[50], filename3[50];
+  char filename1[50], filename2[50], filename3[50], filename4[50];
   sprintf (filename1, "surface/eta_matrix_%g", t);
   sprintf (filename2, "surface/ux_matrix_%g", t);
-  sprintf (filename3, "surface/uy_matrix_%g", t);  
+  sprintf (filename3, "surface/uy_matrix_%g", t);
+  sprintf (filename4, "surface/uz_matrix_%g", t);
   FILE * feta = fopen (filename1, "w");
   // Might need to change to mpi function later
   output_matrix_mpi (eta, feta, N, linear = true);
@@ -397,6 +405,9 @@ event movie (t += 0.1; t <= TEND)
   FILE * fuy = fopen (filename3, "w");
   output_matrix_mpi (u_temp.y, fuy, N, linear = true);
   fclose (fuy);  
+  FILE * fuz = fopen (filename4, "w");
+  output_matrix_mpi (w, fuz, N, linear = true);
+  fclose (fuz);
 }
 
 #endif

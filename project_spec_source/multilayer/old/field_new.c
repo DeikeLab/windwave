@@ -5,8 +5,7 @@
 
 #include "grid/multigrid.h"
 #include "view.h"
-#include "layered/hydro.h"
-//#include "layered/hydro_test.h"
+#include "layered/hydro_test.h"
 #include "layered/nh.h"
 #include "layered/remap.h"
 //#include "remap_test.h"
@@ -18,8 +17,8 @@
    The initial condition is a externally imported wave field. Some controlling parameters. */
 
 #define g_ 9.8
-double h_ = 10; // depth of the water
-double gpe_base = 0; // gauge of potential energy
+#define h_ 10
+double gpe_base = 0;
 /* double ETAE = 0.1; // refinement criteria for eta */
 /* int MAXLEVEL = 8; // max level of refinement in adapt_wavelet function */
 /* int MINLEVEL = 6; // min level */
@@ -34,8 +33,6 @@ int N_power_ = 5;
 double F_kxky_[N_mode_*(N_mode_+1)], omega[N_mode_*(N_mode_+1)], phase[N_mode_*(N_mode_+1)];
 double kx_[N_mode_], ky_[N_mode_+1];
 double dkx_, dky_;
-
-int RANDOM; // integer to seed random number generator
 
 double randInRange(int min, int max)
 {
@@ -103,7 +100,7 @@ void power_input() {
     // Phase and omega, next focusing phase
     double kmod = 0;
     int index = 0;
-    srand(RANDOM); // We can seed it differently for different runs
+    srand(4); // We can seed it differently for different runs
     for (int i=0; i<N_mode_;i++) {
       for (int j=0;j<N_mode_;j++) {
 	index = j*N_mode_ + i;
@@ -246,26 +243,20 @@ int main(int argc, char * argv[])
     nu = atof(argv[4]);
   else
     nu = 0.;
-  if (argc > 5)
-    RANDOM = atoi(argv[5]);
-  if (argc > 6)
-    L0 = atof(argv[6]);
-  else
-    L0 = 50.;
+  L0 = 50.;
   origin (-L0/2., -L0/2.);
   periodic (right);
   periodic (top);
   N = 1 << LEVEL_data; // start with a grid of 128
   nl = NLAYER;
   G = g_;
-  h_ = L0/5.; // set the water depth to be 1/5 the field size (ad hoc)
   /** Use the already written remapping function. 
       coeff is the one defined with remap_test.h but is now replaced by the geometric beta function. 
       See example/breaking.c for details. 
       theta_H also follows the one defined in the breaking example. */
   // coeff = 0.05;
-  // geometric_beta (1./3., true);
-  // theta_H = 0.51;
+  geometric_beta (1./3., true);
+  theta_H = 0.51;
 
 #if dimension == 2
   gpe_base = -0.5*sq(h_)*sq(L0)*g_;
@@ -281,7 +272,6 @@ event init (i = 0)
 {
   if (!restore ("restart")) {
     power_input();
-    geometric_beta (1./3., true);
     foreach() {
       zb[] = -h_;
       eta[] = wave(x, y);
@@ -364,7 +354,7 @@ event movie (t += 0.1; t <= TEND)
   sprintf (s, "t = %.2f", t);
   draw_string (s, size = 30);
   sprintf (s, "u%d.x", nl-1);
-  squares (s, linear = true, z = "eta", min = -2./7.*sqrt(L0), max = 2./7.*sqrt(L0));
+  squares (s, linear = true, z = "eta", min = -2, max = 2);
   {
   static FILE * fp = POPEN ("ux", "a");
   save (fp = fp);
@@ -374,17 +364,16 @@ event movie (t += 0.1; t <= TEND)
     slope[] = (eta[1]-eta[-1])/(2.*Delta);
   }
   clear();
-  squares ("slope", linear = true, z = "eta", min = -1./50.*L0, max = 1./50.*L0);
+  squares ("slope", linear = true, z = "eta", min = -1, max = 1);
   sprintf (s, "t = %.2f", t);
   draw_string (s, size = 30);
   {
   static FILE * fp = POPEN ("slope", "a");
   save (fp = fp);
   }
-  char filename1[50], filename2[50], filename3[50];
+  char filename1[50], filename2[50];
   sprintf (filename1, "surface/eta_matrix_%g", t);
   sprintf (filename2, "surface/ux_matrix_%g", t);
-  sprintf (filename3, "surface/uy_matrix_%g", t);  
   FILE * feta = fopen (filename1, "w");
   // Might need to change to mpi function later
   output_matrix_mpi (eta, feta, N, linear = true);
@@ -394,9 +383,6 @@ event movie (t += 0.1; t <= TEND)
   FILE * fux = fopen (filename2, "w");
   output_matrix_mpi (u_temp.x, fux, N, linear = true);
   fclose (fux);
-  FILE * fuy = fopen (filename3, "w");
-  output_matrix_mpi (u_temp.y, fuy, N, linear = true);
-  fclose (fuy);  
 }
 
 #endif

@@ -3,7 +3,8 @@
 
 */
 
-#include "grid/multigrid.h"
+//#include "grid/multigrid.h"
+#include "grid/quadtree.h"
 #include "view.h"
 #include "layered/hydro.h"
 //#include "layered/hydro_test.h"
@@ -20,12 +21,14 @@
 #define g_ 9.8
 double h_ = 10; // depth of the water
 double gpe_base = 0; // gauge of potential energy
-/* double ETAE = 0.1; // refinement criteria for eta */
-/* int MAXLEVEL = 8; // max level of refinement in adapt_wavelet function */
-/* int MINLEVEL = 6; // min level */
+/** if adaptive mesh is used. */
+double ETAE = 0.1; // refinement criteria for eta
+int MAXLEVEL = 8; // max level of refinement in adapt_wavelet function
+int MINLEVEL = 7; // min level
 double TEND = 50.; // t end
 int NLAYER = 10; // number of layers
 int LEVEL_data = 7;
+double CFL_choice = 1.; // choice of CFL number
 
 double kp_ = 2.*pi/10.;
 double P_ = 0.01;
@@ -233,13 +236,29 @@ double u_z (double x, double y, double z) {
   return u_z;
 }
 
+/** Adaptive function: is it ok to use? */
+int my_adapt() {
+#if QUADTREE
+  /* scalar eta[]; */
+  /* foreach() */
+  /*   eta[] = h[] > dry ? h[] + zb[] : 0; */
+  /* astats s = adapt_wavelet ({eta, etamax}, (double[]){ETAE,ETAMAXE}, */
+  /* 			    MAXLEVEL, MINLEVEL); */
+  astats s = adapt_wavelet ({eta}, (double[]){ETAE}, MAXLEVEL, MINLEVEL);
+  fprintf (stderr, "# refined %d cells, coarsened %d cells\n", s.nf, s.nc);
+  return s.nf;
+#else // Cartesian
+  return 0;
+#endif
+}
 
 int main(int argc, char * argv[])
 {
   if (argc > 1)
     NLAYER = atoi(argv[1]);
   if (argc > 2)
-    LEVEL_data = atoi(argv[2]);
+    // LEVEL_data = atoi(argv[2]);
+    MAXLEVEL = atoi(argv[2]);
   if (argc > 3)
     TEND = atof(argv[3]);
   if (argc > 4)
@@ -252,13 +271,21 @@ int main(int argc, char * argv[])
     L0 = atof(argv[6]);
   else
     L0 = 50.;
+  if (argc > 7)
+    ETAE = atof(argv[7]);
+  else
+    ETAE = 0.00001;
+  if (argc > 8)
+    CFL_choice = atof(argv[8]);
+  
   origin (-L0/2., -L0/2.);
   periodic (right);
   periodic (top);
-  N = 1 << LEVEL_data; // start with a grid of 128
+  N = 1 << MINLEVEL; // start with a grid with the minimal refinement
   nl = NLAYER;
   G = g_;
   h_ = L0/5.; // set the water depth to be 1/5 the field size (ad hoc)
+
   /** Use the already written remapping function. 
       coeff is the one defined with remap_test.h but is now replaced by the geometric beta function. 
       See example/breaking.c for details. 
@@ -272,8 +299,9 @@ int main(int argc, char * argv[])
 #else
   gpe_base = -0.5*sq(h_)*L0*g_;
 #endif
-  CFL_H = 1; // Smaller time step
+  CFL_H = CFL_choice; // Smaller time step
   // max_slope = 0.8;
+  fprintf (stderr, "ETAE = %f, nu = %f\n", ETAE, nu);
   run();
 }
 
@@ -302,7 +330,7 @@ event init (i = 0)
 	z += h[]/2.;
       }
     }
-    fprintf (stderr,"Done initialization!\n");
+    fprintf (stderr, "Done initialization!\n");
     dump("initial");
   }
 }
@@ -366,8 +394,8 @@ event movie (t += 0.1; t <= TEND)
   sprintf (s, "u%d.x", nl-1);
   squares (s, linear = true, z = "eta", min = -2./7.*sqrt(L0), max = 2./7.*sqrt(L0));
   {
-  static FILE * fp = POPEN ("ux", "a");
-  save (fp = fp);
+    static FILE * fp = POPEN ("ux", "a");
+    save (fp = fp);
   }
   scalar slope[];
   foreach () {
@@ -378,24 +406,38 @@ event movie (t += 0.1; t <= TEND)
   sprintf (s, "t = %.2f", t);
   draw_string (s, size = 30);
   {
-  static FILE * fp = POPEN ("slope", "a");
-  save (fp = fp);
+    static FILE * fp = POPEN ("slope", "a");
+    save (fp = fp);
   }
+  // Extra output of refinement level
+  clear();
+  scalar l[];
+  foreach () {
+    l[] = level;
+  }
+  squares ("l", linear = true, z = "eta", min = MINLEVEL, max = MAXLEVEL);
+  sprintf (s, "t = %.2f", t);
+  draw_string (s, size = 30);
+  {
+    static FILE * fp = POPEN ("level", "a");
+    save (fp = fp);
+  }
+  double NPOINT = 1 << MAXLEVEL; // start with a grid with the minimal refinement
   char filename1[50], filename2[50], filename3[50];
   sprintf (filename1, "surface/eta_matrix_%g", t);
   sprintf (filename2, "surface/ux_matrix_%g", t);
   sprintf (filename3, "surface/uy_matrix_%g", t);  
   FILE * feta = fopen (filename1, "w");
   // Might need to change to mpi function later
-  output_matrix_mpi (eta, feta, N, linear = true);
+  output_matrix_mpi (eta, feta, NPOINT, linear = true);
   fclose (feta);
   sprintf (s, "u%d", nl-1);
   vector u_temp = lookup_vector (s);
   FILE * fux = fopen (filename2, "w");
-  output_matrix_mpi (u_temp.x, fux, N, linear = true);
+  output_matrix_mpi (u_temp.x, fux, NPOINT, linear = true);
   fclose (fux);
   FILE * fuy = fopen (filename3, "w");
-  output_matrix_mpi (u_temp.y, fuy, N, linear = true);
+  output_matrix_mpi (u_temp.y, fuy, NPOINT, linear = true);
   fclose (fuy);  
 }
 

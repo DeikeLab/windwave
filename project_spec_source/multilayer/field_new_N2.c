@@ -29,7 +29,7 @@ int LEVEL_data = 7;
 
 double kp_ = 2.*pi/10.;
 double P_ = 0.01;
-int N_power_ = 5;
+int N_power_ = 2;
 #define N_mode_ 16
 double F_kxky_[N_mode_*(N_mode_+1)], omega[N_mode_*(N_mode_+1)], phase[N_mode_*(N_mode_+1)];
 double kx_[N_mode_], ky_[N_mode_+1];
