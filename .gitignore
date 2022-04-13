@@ -7,3 +7,6 @@ slurm*.out
 \_*
 \#*\#
 */pre*/*
+nograph.o*
+nograph.e*
+*message*

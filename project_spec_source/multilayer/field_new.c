@@ -252,6 +252,10 @@ int main(int argc, char * argv[])
     L0 = atof(argv[6]);
   else
     L0 = 50.;
+  if (argc > 7)
+    theta_H = atof(argv[7]);
+  else
+    theta_H = 0.5;
   origin (-L0/2., -L0/2.);
   periodic (right);
   periodic (top);

@@ -13,13 +13,13 @@
 #The executable name
 EXE=curved_fixREtau_precursor
 #Parameter value
-LEVEL=9
+LEVEL=11
 RE_tau=720 #Default 40000
 BO=200
 g=4
 ak=0
 TIME=500
-emaxRATIO=0.3
+emaxRATIO=0.1
 alterMU=8
 
 
@@ -30,7 +30,7 @@ mkdir -p $ScratchDir
 cp /work/06342/tg856416/stampede2/f$EXE/$EXE $ScratchDir 
 cp /home1/06342/tg856416/windwave/project_spec_source/turbulence/curved/${EXE}.c $ScratchDir
 cd $ScratchDir
-cp ../curved_fixREtau_precursor_precursor_REtau7200_ak0_LEVEL9_emax0.3/dump10 ./restart
+cp ../curved_fixREtau_precursor_REtau720_ak0_LEVEL10_emax0.3/dump74 ./restart
 mkdir ./field
 mkdir ./eta
 ibrun ./$EXE $RE_tau $BO $LEVEL $g $ak $TIME $emaxRATIO $alterMU > message 2>&1 

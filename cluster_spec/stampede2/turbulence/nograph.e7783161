@@ -1,2 +1,0 @@
-cp: cannot stat ‘../curved_fixREtau_precursor_REtau7200_ak0_LEVEL9_emax0.3/dump10’: No such file or directory
-slurmstepd: error: *** JOB 7783161 ON c401-031 CANCELLED AT 2021-05-26T16:48:32 DUE TO TIME LIMIT ***
