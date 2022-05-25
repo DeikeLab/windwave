@@ -342,7 +342,7 @@ event pair_out (i++){
     }
     //output_twophase();
     //output_twophase_fraction ();
-    //output_twophase_locate(snapshot_time);
+    output_twophase_locate(snapshot_time);
     return 1;
   }
 }
