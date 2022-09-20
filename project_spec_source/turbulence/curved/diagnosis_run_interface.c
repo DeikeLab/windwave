@@ -335,8 +335,8 @@ event pair_out (i++){
     }
     for (int i=0; i<Nslice; i++) {
       zslice += L0/Nslice;
-      /* sprintf (filename, "./field/p_run_t%g_slice%d", snapshot_time, i); */
-      /* sliceXY (filename,p,zslice,OUTLEVEL); */
+      sprintf (filename, "./field/f_t%g_slice%d", snapshot_time, i);
+      sliceXY (filename,f,zslice,OUTLEVEL);
       sprintf (filename, "./field/pair_run_t%g_slice%d", snapshot_time, i);
       sliceXY (filename,pair,zslice,OUTLEVEL);
     }

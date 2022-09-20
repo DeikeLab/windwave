@@ -470,7 +470,6 @@ event end (t = 1000.) {
   dump ("end");
 }
 
-<<<<<<< HEAD
 /* event dumpforrestart (t += 0.1) { */
 /*   char dname[100]; */
 /*   u_water.x.nodump = true; */
@@ -480,7 +479,7 @@ event end (t = 1000.) {
 /*   // sprintf (dname, "restart"); */
 /*   dump (); */
 /* } */
-=======
+
 event dumpforrestart (t += 1) {
   char dname[100];
   u_water.x.nodump = true;
@@ -490,7 +489,6 @@ event dumpforrestart (t += 1) {
   sprintf (dname, "restart");
   dump (dname);
 }
->>>>>>> a72d63e7f48b7204211c2af79ba6121dd21a99bb
 
 event dumpstep (t += 0.5) {
   char dname[100];
