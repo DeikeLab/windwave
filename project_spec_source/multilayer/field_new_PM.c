@@ -1,225 +1,33 @@
 /**
    # Field scale wave breaking (multilayer solver)
-
 */
 
 #include "grid/multigrid.h"
 #include "view.h"
 #include "layered/hydro.h"
-//#include "layered/hydro_test.h"
 #include "layered/nh.h"
 #include "layered/remap.h"
-//#include "remap_test.h"
 #include "layered/perfs.h"
 #include "input.h"
-#include "output_mpi.h"
+#include "output_mpi.h" // MPI compatible output functions from Antoon
 
-/**
-   The initial condition is a externally imported wave field. Some controlling parameters. */
+/** 
+## Spectrum initialization
+Include functions that reads in the spectrum and initialize the wave orbital velocity. */
 
 #define g_ 9.8
 double h_ = 10; // depth of the water
 double gpe_base = 0; // gauge of potential energy
+double TEND = 50.; // t end
+int NLAYER = 10; // number of layers
+int LEVEL_data = 7; // horizontal resolution
+
+#include "./spectrum.h" 
+
+// Not sure about the adaptivity
 /* double ETAE = 0.1; // refinement criteria for eta */
 /* int MAXLEVEL = 8; // max level of refinement in adapt_wavelet function */
 /* int MINLEVEL = 6; // min level */
-double TEND = 50.; // t end
-int NLAYER = 10; // number of layers
-int LEVEL_data = 7;
-
-/* double kp_ = 2.*pi/10.; */
-/* double P_ = 0.01; */
-#define N_mode_ 32 // Corresponds to input of 32 modes in kx and 33 modes in ky
-double F_kxky_[N_mode_*(N_mode_+1)], omega[N_mode_*(N_mode_+1)], phase[N_mode_*(N_mode_+1)];
-double kx_[N_mode_], ky_[N_mode_+1];
-double dkx_, dky_;
-
-int RANDOM; // integer to seed random number generator
-
-double randInRange(int min, int max)
-{
-  return min + (rand() / (double) (RAND_MAX) * (max - min + 1));
-}
-
-void power_input() {
-  /* for (int i=0; i<N_mode_; i++) { */
-  /*   kx_[i] = 2.*pi/L0*(i+1); */
-  /*   ky_[i] = 2.*pi/L0*(i-N_mode_/2); */
-  /* } */
-  /* ky_[N_mode_] = 2.*pi/L0*N_mode_/2; */
-/** 
-A MPI compatible function that reads in kx_, ky_, and F_kxky_. Next step is to generate F_kxky_ inside basilisk too. For now kx_, ky_ are 1D arrays while F_kxky_ is a 2D array. The root process reads in and then broadcast to all other processes. It looks for files named F_kxky, 
-*/
-#if _MPI 
-  int length1D, length2D; // The length of the array to be read
-  char message[20];
-  int i, rank, size;
-  MPI_Status status;
-  int root = 0;
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-  if (rank == root) {
-    // First read in F_kxky_
-    length2D = N_mode_*(N_mode_+1);
-    float * a = (float*) malloc (sizeof(float)*length2D);
-    char filename[100];
-    sprintf (filename, "F_kxky");
-    FILE * fp = fopen (filename, "rb");
-    fread (a, sizeof(float), length2D, fp);
-    for (int i=0;i<length2D;i++) {
-      F_kxky_[i] = (double)a[i];
-    }
-    fclose (fp);
-
-    // Then read in kx_, ky_
-    length1D = N_mode_;
-    float * b1 = (float*) malloc (sizeof(float)*length1D);
-    sprintf (filename, "kx");
-    FILE *fp1 = fopen (filename, "rb");
-    fread (b1, sizeof(float), length1D, fp1);
-    for (int i=0;i<length1D;i++) {
-      kx_[i] = (double)b1[i];
-    }
-    fclose (fp1);
-
-    // One more mode in ky
-    float * b2 = (float*) malloc (sizeof(float)*(length1D+1));
-    sprintf (filename, "ky");
-    FILE *fp2 = fopen (filename, "rb");
-    fread (b2, sizeof(float), length1D+1, fp2);
-    for (int i=0;i<length1D+1;i++) {
-      ky_[i] = (double)b2[i];
-    }
-    fclose (fp2);
-
-    // Wave frequency omega, and randomly generated phase
-    double kmod = 0;
-    int index = 0;
-    srand(RANDOM); // We can seed it differently for different runs
-    for (int i=0; i<N_mode_; i++) {
-      for (int j=0; j<N_mode_+1; j++) {
-	index = j*N_mode_ + i;
-	kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
-	omega[index] = sqrt(g_*kmod);
-	phase[index] = randInRange (0, 2.*pi);
-      }
-    }
-  }
-  MPI_Bcast(&kx_, length1D, MPI_DOUBLE, root, MPI_COMM_WORLD);
-  MPI_Bcast(&ky_, length1D+1, MPI_DOUBLE, root, MPI_COMM_WORLD);
-  MPI_Bcast(&F_kxky_, length2D, MPI_DOUBLE, root, MPI_COMM_WORLD);
-  MPI_Bcast(&omega, length2D, MPI_DOUBLE, root, MPI_COMM_WORLD);
-  MPI_Bcast(&phase, length2D, MPI_DOUBLE, root, MPI_COMM_WORLD);
-  // Make sure that the inputs are correct 
-  char checkout[100];
-  sprintf (checkout, "F-%d", pid());
-  FILE * fout = fopen (checkout, "w");
-  for (int i=0; i<length2D; i++)
-    fprintf (fout, "%g ", F_kxky_[i]);
-  fclose (fout);
-  sprintf (checkout, "ky-%d", pid());
-  fout = fopen (checkout, "w");
-  for (int i=0; i<length1D+1; i++)
-    fprintf (fout, "%g ", ky_[i]);
-  fclose (fout);
-#else
-  int length2D = N_mode_*(N_mode_+1);
-  float * a = (float*) malloc (sizeof(float)*length2D);
-  char filename[100];
-  sprintf (filename, "F_kxky");
-  FILE * fp = fopen (filename, "rb");
-  fread (a, sizeof(float), length2D, fp);
-  for (int i=0;i<length2D;i++) {
-    F_kxky_[i] = (double)a[i];
-  }
-  fclose (fp);
-  // Phase and omega, next focusing phase
-  double kmod = 0;
-  int index = 0;
-  srand(0); 
-  for (int i=0; i<N_mode_;i++) {
-    for (int j=0;j<N_mode_+1;j++) {
-      index = j*N_mode_ + i;
-      kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
-      omega[index] = sqrt(g_*kmod);
-      phase[index] = randInRange (0, 2.*pi);
-    }
-  }
-#endif
-}
-
-double wave (double x, double y)
-{
-  double eta = 0;
-  double ampl = 0, a = 0;
-  int index = 0;
-  for (int i=0; i<N_mode_; i++) {
-    for (int j=0; j<N_mode_+1; j++) {
-      index = j*N_mode_ + i;
-      ampl = sqrt(2.*F_kxky_[index]*dkx_*dky_);
-      a = (kx_[i]*x + ky_[j]*y + phase[index]);
-      eta += ampl*cos(a);
-    }
-  }
-  return eta;
-}
-double u_x (double x, double y, double z) {
-  int index = 0;
-  double u_x = 0;
-  double ampl = 0, a = 0;
-  double z_actual = 0, kmod = 0, theta = 0;
-  for (int i=0; i<N_mode_; i++) {
-    for (int j=0; j<N_mode_+1; j++) {
-      index = j*N_mode_ + i;
-      ampl = sqrt(2.*F_kxky_[index]*dkx_*dky_);
-      z_actual = (z < ampl ? (z) : ampl);
-      // fprintf(stderr, "z = %g, ampl = %g, z_actual = %g\n", z, ampl, z_actual);
-      kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
-      theta = atan(ky_[j]/kx_[i]);
-      a = (kx_[i]*x + ky_[j]*y + phase[index]);
-      u_x += sqrt(g_*kmod)*ampl*exp(kmod*z_actual)*cos(a)*cos(theta);
-    }
-  }
-  return u_x;
-}
-// #if dimension = 2
-double u_y (double x, double y, double z) {
-  int index = 0;
-  double u_y = 0;
-  double ampl = 0, a = 0;
-  double z_actual = 0, kmod = 0, theta = 0;
-  for (int i=0; i<N_mode_; i++) {
-    for (int j=0; j<N_mode_+1; j++) {
-      index = j*N_mode_ + i;
-      ampl = sqrt(2.*F_kxky_[index]*dkx_*dky_);
-      z_actual = (z < ampl ? (z) : ampl);
-      kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
-      theta = atan(ky_[j]/kx_[i]);
-      a = (kx_[i]*x + ky_[j]*y + phase[index]);
-      u_y += sqrt(g_*kmod)*ampl*exp(kmod*z_actual)*cos(a)*sin(theta);
-    }
-  }
-  return u_y;
-}
-// #endif
-double u_z (double x, double y, double z) {
-  int index = 0;
-  double u_z = 0;
-  double ampl = 0, a = 0;
-  double z_actual = 0, kmod = 0;
-  for (int i=0; i<N_mode_; i++) {
-    for (int j=0; j<N_mode_+1; j++) {
-      index = j*N_mode_ + i;
-      ampl = sqrt(2.*F_kxky_[index]*dkx_*dky_);
-      z_actual = (z < ampl ? (z) : ampl);
-      kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
-      a = (kx_[i]*x + ky_[j]*y + phase[index]);
-      u_z += sqrt(g_*kmod)*ampl*exp(kmod*z_actual)*sin(a);
-    }
-  }
-  return u_z;
-}
 
 /** 
 ## Parameters
@@ -243,8 +51,12 @@ int main(int argc, char * argv[])
     L0 = atof(argv[6]); // Box size (not necessarily related to peak wave number)
   else
     L0 = 50.;
-  if (argc > 7)
-    theta_H = atof(argv[7]); // Numerical parameter to dump fast barotropic modes
+  if (argc > 7) 
+    kp_ = 2.*pi/atof(argv[7]); // Peak wavelength 
+  else 
+    kp_ = 2.*pi/(L0/5.); // By default it is 1/5 boxsize
+  if (argc > 8)
+    theta_H = atof(argv[8]); // Numerical parameter to dump fast barotropic modes
   else
     theta_H = 0.5;
   origin (-L0/2., -L0/2.);
@@ -253,7 +65,7 @@ int main(int argc, char * argv[])
   N = 1 << LEVEL_data; 
   nl = NLAYER;
   G = g_;
-  h_ = L0/5.; // set the water depth to be 1/5 the field size (ad hoc)
+  h_ = 2.*pi/kp_; // set the water depth to be the peak wave length (should be enough for the deep water assumption)
   /** Use the already written remapping function. 
       coeff is the one defined with remap_test.h but is now replaced by the geometric beta function. 
       See example/breaking.c for details. 
@@ -268,6 +80,7 @@ int main(int argc, char * argv[])
   gpe_base = -0.5*sq(h_)*L0*g_;
 #endif
   CFL_H = 1; // Smaller time step
+  // We can play with the slope-limited
   // max_slope = 0.8;
   run();
 }
@@ -276,6 +89,7 @@ int main(int argc, char * argv[])
 ## Initialization
 Read in the power spectrum and initialize the wave field. 
  */
+
 event init (i = 0)
 {
   if (!restore ("restart")) {
@@ -309,6 +123,9 @@ event init (i = 0)
   }
 }
 
+/** 
+## Output 
+This is not necessary. It seems that the remapping does not change the energy. */
 event energy_before_remap (i++, last)
 {
   if (i==10) {
@@ -356,7 +173,7 @@ event energy_after_remap (i++, last)
 }
 
 /**
-   Note that the movie generation below is very expensive. */
+Note that the movie generation below is very expensive. */
 #  define POPEN(name, mode) fopen (name ".ppm", mode)
 #if 1
 event movie (t += 0.1; t <= TEND)
@@ -366,23 +183,23 @@ event movie (t += 0.1; t <= TEND)
   sprintf (s, "t = %.2f", t);
   draw_string (s, size = 30);
   sprintf (s, "u%d.x", nl-1);
-  squares (s, linear = true, z = "eta", min = -2./7.*sqrt(L0), max = 2./7.*sqrt(L0));
+  squares (s, linear = true, z = "eta", min = -1.6*sqrt(1./kp_), max = 1.6*sqrt(1./kp_));
   {
   static FILE * fp = POPEN ("ux", "a");
   save (fp = fp);
   }
-  scalar slope[];
-  foreach () {
-    slope[] = (eta[1]-eta[-1])/(2.*Delta);
-  }
-  clear();
-  squares ("slope", linear = true, z = "eta", min = -1./50.*L0, max = 1./50.*L0);
-  sprintf (s, "t = %.2f", t);
-  draw_string (s, size = 30);
-  {
-  static FILE * fp = POPEN ("slope", "a");
-  save (fp = fp);
-  }
+  /* scalar slope[]; */
+  /* foreach () { */
+  /*   slope[] = (eta[1]-eta[-1])/(2.*Delta); */
+  /* } */
+  /* clear(); */
+  /* squares ("slope", linear = true, z = "eta", min = -1./50.*L0, max = 1./50.*L0); */
+  /* sprintf (s, "t = %.2f", t); */
+  /* draw_string (s, size = 30); */
+  /* { */
+  /* static FILE * fp = POPEN ("slope", "a"); */
+  /* save (fp = fp); */
+  /* } */
   char filename1[50], filename2[50], filename3[50];
   sprintf (filename1, "surface/eta_matrix_%g", t);
   sprintf (filename2, "surface/ux_matrix_%g", t);
@@ -400,8 +217,41 @@ event movie (t += 0.1; t <= TEND)
   output_matrix_mpi (u_temp.y, fuy, N, linear = true);
   fclose (fuy);  
 }
-
 #endif
+
+#if PARAVIEW
+event paraview (t>100; t += 0.2; t <= TEND) {
+  char s[80];
+  char filename1[50], filename2[50], filename3[50], filename4[50];
+  for (int j=0; j<nl; ++j) {
+    sprintf (filename1, "field/ux_matrix_l%d", j);
+    sprintf (filename2, "field/uy_matrix_l%d", j);  
+    sprintf (filename3, "field/uz_matrix_l%d", j);  
+    sprintf (filename4, "field/h_matrix_l%d", j);  
+    sprintf (s, "u%d", j);
+    vector u_temp = lookup_vector (s);
+    FILE * fux = fopen (filename1, "w");
+    output_matrix_mpi (u_temp.x, fux, N, linear = true);
+    fclose (fux);
+    FILE * fuy = fopen (filename2, "w");
+    output_matrix_mpi (u_temp.y, fuy, N, linear = true);
+    fclose (fuy);
+    FILE * fuz = fopen (filename3, "w");
+    sprintf (s, "w%d", j);
+    scalar w_temp = lookup_field (s);
+    output_matrix_mpi (w_temp, fuz, N, linear = true);
+    fclose (fuz);
+    FILE * fh = fopen (filename4, "w");
+    sprintf (s, "h%d", j);
+    scalar h_temp = lookup_field (s);
+    output_matrix_mpi (h_temp, fh, N, linear = true);
+    fclose (fh);    
+  }
+}
+#endif
+
+/** 
+The mesh is not adaptive yet. */
 
 #if QUADTREE
 event adapt (i++) {
