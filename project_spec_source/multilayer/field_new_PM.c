@@ -220,14 +220,14 @@ event movie (t += 0.1; t <= TEND)
 #endif
 
 #if PARAVIEW
-event paraview (t>100; t += 0.2; t <= TEND) {
+event paraview (t = 100; t += 0.2; t <= TEND) {
   char s[80];
   char filename1[50], filename2[50], filename3[50], filename4[50];
   for (int j=0; j<nl; ++j) {
-    sprintf (filename1, "field/ux_matrix_l%d", j);
-    sprintf (filename2, "field/uy_matrix_l%d", j);  
-    sprintf (filename3, "field/uz_matrix_l%d", j);  
-    sprintf (filename4, "field/h_matrix_l%d", j);  
+    sprintf (filename1, "field/ux_matrix_t%g_l%d", t, j);
+    sprintf (filename2, "field/uy_matrix_t%g_l%d", t, j);  
+    sprintf (filename3, "field/uz_matrix_t%g_l%d", t, j);  
+    sprintf (filename4, "field/h_matrix_t%g_l%d", t, j);  
     sprintf (s, "u%d", j);
     vector u_temp = lookup_vector (s);
     FILE * fux = fopen (filename1, "w");
