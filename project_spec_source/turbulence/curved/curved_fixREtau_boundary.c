@@ -11,8 +11,8 @@
 #include "navier-stokes/perfs.h"
 
 //#include "adapt_wavelet_limited.h"
-#include "sandbox/frac-dist.h" // extra headerfiles used in profiling function
-#include "sandbox/profile6.h"  // from Antoon
+//#include "sandbox/frac-dist.h" // extra headerfiles used in profiling function
+//#include "sandbox/profile6.h"  // from Antoon
 
 #define POPEN(name, mode) fopen (name ".ppm", mode)
 
